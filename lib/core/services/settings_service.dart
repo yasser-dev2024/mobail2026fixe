@@ -1,0 +1,165 @@
+import '../constants/app_constants.dart';
+import '../database/database_service.dart';
+
+class SettingsService {
+  static final SettingsService _instance = SettingsService._internal();
+  factory SettingsService() => _instance;
+  SettingsService._internal();
+
+  static const defaultShopName = 'محل جوالات ProShop';
+
+  final DatabaseService _db = DatabaseService();
+
+  // Cached settings in memory
+  Map<String, String> _cache = {};
+  bool _loaded = false;
+
+  // ---------------------------------------------------------------------------
+  // Field accessors (all read from cache with safe defaults)
+  // ---------------------------------------------------------------------------
+
+  String get shopName => _cache['shop_name'] ?? defaultShopName;
+  String get shopPhone => _cache['shop_phone'] ?? '';
+  String get shopPhone2 => _cache['shop_phone2'] ?? '';
+  String get shopAddress => _cache['shop_address'] ?? '';
+  String get shopEmail => _cache['shop_email'] ?? '';
+  String get commercialRegister => _cache['commercial_register'] ?? '';
+  String get taxNumber => _cache['tax_number'] ?? '';
+  String get shopId => _cache['shop_id'] ?? 'default_shop';
+  String get tradeName => _cache['trade_name'] ?? '';
+  String get shopWhatsapp => _cache['shop_whatsapp'] ?? '';
+  String get mapUrl => _cache['map_url'] ?? '';
+  double get taxRate => double.tryParse(_cache['tax_rate'] ?? '0') ?? 0;
+  String get currency => _cache['currency'] ?? 'ر.س';
+  String get warrantyTerms => _cache['warranty_terms'] ?? '';
+  List<String> get deviceReceiverNames {
+    final stored = _cache['device_receiver_names'] ?? '';
+    final legacy = _cache['device_receiver_name'] ?? '';
+    final names = <String>[
+      ...stored.split('\n'),
+      if (stored.trim().isEmpty) legacy,
+    ]
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList();
+    return List.unmodifiable(names);
+  }
+
+  String get deviceReceiverName =>
+      deviceReceiverNames.isEmpty ? '' : deviceReceiverNames.first;
+  String get invoiceFooter => _cache['invoice_footer'] ?? '';
+  String get invoiceIntroText => _cache['invoice_intro_text'] ?? '';
+  String get invoiceGeneralTerms => _cache['invoice_general_terms'] ?? '';
+  String get invoiceReturnPolicy => _cache['invoice_return_policy'] ?? '';
+  String get invoiceLegalNotes => _cache['invoice_legal_notes'] ?? '';
+  String get invoiceCopyright => _cache['invoice_copyright'] ?? '';
+  String get invoiceMessageTemplate => _cache['invoice_message_template'] ?? '';
+  String get invoicePrefix {
+    final prefix = (_cache['invoice_prefix'] ?? 'INV').trim();
+    return prefix.isEmpty ? 'INV' : prefix;
+  }
+
+  bool get invoiceResetYearly => _cache['invoice_reset_yearly'] != 'false';
+  bool get invoiceIncludeIntakePhotos =>
+      _cache['invoice_include_intake_photos'] != 'false';
+  bool get invoiceShowSignature => _cache['invoice_show_signature'] != 'false';
+  bool get autoBackup => _cache['auto_backup'] == 'true';
+  bool get autoWhatsappSend => _cache['auto_whatsapp_send'] == 'true';
+  bool get shopSetupCompleted => _cache['shop_setup_completed'] == 'true';
+  int get autoBackupInterval {
+    final days = int.tryParse(_cache['auto_backup_interval'] ?? '') ??
+        AppConstants.automaticBackupIntervalDays;
+    return days < AppConstants.automaticBackupIntervalDays
+        ? AppConstants.automaticBackupIntervalDays
+        : days;
+  }
+
+  String get logoPath => _cache['logo_path'] ?? '';
+  String get stampPath => _cache['stamp_path'] ?? '';
+  String get signaturePath => _cache['signature_path'] ?? '';
+  String get managerName => _cache['manager_name'] ?? '';
+  String get managerTitle => _cache['manager_title'] ?? '';
+  int get photoRequiredCount =>
+      int.tryParse(_cache['photo_required_count'] ?? '0') ?? 0;
+  int get photoMaxSizeMb =>
+      int.tryParse(_cache['photo_max_size_mb'] ?? '10') ?? 10;
+  int get photoQuality => int.tryParse(_cache['photo_quality'] ?? '85') ?? 85;
+  bool get photoCompress => _cache['photo_compress'] != 'false';
+  bool get photoKeepOriginal => _cache['photo_keep_original'] != 'false';
+  bool get photoWatermarkReports => _cache['photo_watermark_reports'] == 'true';
+  String get photoReportDefaultType =>
+      _cache['photo_report_default_type'] ?? 'intake';
+  int get photoReportImagesPerPage =>
+      int.tryParse(_cache['photo_report_images_per_page'] ?? '4') ?? 4;
+  bool get photoShowEmployee => _cache['photo_show_employee'] != 'false';
+  bool get photoShowDateTime => _cache['photo_show_datetime'] != 'false';
+  List<String> get photoRequiredTypes =>
+      _lines(_cache['photo_required_types'] ?? '');
+  List<String> get photoOptionalTypes {
+    final values = _lines(_cache['photo_optional_types'] ?? '');
+    return values.isEmpty ? AppConstants.defaultDevicePhotoTypes : values;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
+  /// Loads all settings from the database into the in-memory cache.
+  /// Subsequent accessor calls are served from cache until [reload] is called.
+  Future<void> load() async {
+    if (_loaded) return;
+    _cache = await _db.getAllSettings();
+    _loaded = true;
+  }
+
+  /// Persists each entry in [settings] to the database and updates the cache.
+  Future<void> save(Map<String, String> settings) async {
+    for (final entry in settings.entries) {
+      await _db.setSetting(entry.key, entry.value);
+      _cache[entry.key] = entry.value;
+    }
+  }
+
+  /// Saves the one-time shop setup data and prevents showing the setup gate on
+  /// later app launches.
+  Future<void> completeShopSetup(Map<String, String> settings) async {
+    await save({
+      ...settings,
+      'shop_setup_completed': 'true',
+      'shop_setup_completed_at':
+          DateTime.now().millisecondsSinceEpoch.toString(),
+    });
+  }
+
+  /// Returns the value for [key].
+  ///
+  /// Served from cache when already loaded; falls back to a direct DB read
+  /// otherwise (without marking the full cache as loaded).
+  Future<String?> getSetting(String key) async {
+    if (_loaded) return _cache[key];
+    return _db.getSetting(key);
+  }
+
+  /// Writes [value] for [key] to both the database and the in-memory cache.
+  Future<void> setSetting(String key, String value) async {
+    await _db.setSetting(key, value);
+    _cache[key] = value;
+  }
+
+  /// Invalidates the cache and reloads all settings from the database.
+  Future<void> reload() async {
+    _loaded = false;
+    await load();
+  }
+
+  List<String> _lines(String value) {
+    final seen = <String>{};
+    return value
+        .split('\n')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .where((item) => seen.add(item))
+        .toList(growable: false);
+  }
+}

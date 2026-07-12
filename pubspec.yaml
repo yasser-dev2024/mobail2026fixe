@@ -1,0 +1,80 @@
+name: mobile_shop_pro
+description: نظام إدارة محل جوالات وصيانة احترافي
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Database
+  sqflite_common_ffi: ^2.3.4+1
+  sqflite: ^2.3.3+1
+  path: ^1.9.1
+
+  # State Management
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.5
+
+  # Navigation
+  go_router: ^14.6.2
+
+  # UI & Animations
+  flutter_animate: ^4.5.0
+  google_fonts: ^6.2.1
+  fl_chart: ^0.69.0
+  shimmer: ^3.0.0
+
+  # File & Media
+  file_picker: ^8.1.7
+  image_picker: ^1.1.2
+  permission_handler: ^11.3.1
+
+  # Utils
+  intl: ^0.20.2
+  uuid: ^4.5.1
+  crypto: ^3.0.6
+  shared_preferences: ^2.3.3
+  path_provider: ^2.1.5
+
+  # PDF & Printing
+  pdf: ^3.11.1
+  printing: ^5.13.2
+
+  # Excel Export
+  excel: ^4.0.6
+
+  # QR Code
+  qr_flutter: ^4.1.0
+
+  # Archive (Backup)
+  archive: ^3.6.1
+
+  # URL Launcher (WhatsApp)
+  url_launcher: ^6.3.1
+
+  # Icons
+  cupertino_icons: ^1.0.8
+
+  # Window management
+  window_manager: ^0.4.3
+
+  # Drag & Drop for Desktop
+  desktop_drop: ^0.4.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - assets/images/
+    - assets/icons/
