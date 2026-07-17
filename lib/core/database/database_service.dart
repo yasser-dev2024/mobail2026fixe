@@ -873,6 +873,10 @@ class DatabaseService {
       'license_number': '',
       'shop_whatsapp': '',
       'map_url': '',
+      'tracking_base_url': 'https://proshop.example.com/track',
+      'privacy_policy_url': '',
+      'privacy_policy_accepted_version': '',
+      'privacy_policy_accepted_at': '',
       'stamp_path': '',
       'signature_path': '',
       'manager_name': '',
@@ -947,7 +951,7 @@ class DatabaseService {
         'key': AppConstants.waTplReceived,
         'name': 'تم استلام الجهاز',
         'template':
-            'السلام عليكم {customer_name}،\nتم استلام جهازك {device} بنجاح.\nرقم الصيانة: {ticket_number}\nسنتواصل معك فور الانتهاء.\nشكراً لثقتك بنا.'
+            'السلام عليكم {customer_name}،\nرابط تتبع حالة الجهاز مباشرة بدون إدخال:\n{tracking_url}\nرقم الصيانة: {ticket_number}\nتم استلام جهازك {device} بنجاح.\nسنتواصل معك فور الانتهاء.\nشكراً لثقتك بنا.'
       },
       {
         'id': 'tpl_2',

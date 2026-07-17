@@ -979,7 +979,7 @@ class _ActiveDevicesSection extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 430,
-                  mainAxisExtent: 252,
+                  mainAxisExtent: 296,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
                 ),
@@ -1228,7 +1228,7 @@ class _RepairCustomerCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   group.latestProblem,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.cairo(
                     color: colors.textPrimary,
@@ -1248,11 +1248,15 @@ class _RepairCustomerCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
                     icon: const Icon(Icons.inventory_2_rounded, size: 18),
-                    label: Text(
-                      'فتح الجوالات',
-                      style: GoogleFonts.cairo(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'فتح الجوالات',
+                        maxLines: 1,
+                        style: GoogleFonts.cairo(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
@@ -1337,7 +1341,7 @@ class _CustomerDevicesDialog extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 430,
-                  mainAxisExtent: 360,
+                  mainAxisExtent: 430,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
                 ),
@@ -1443,6 +1447,8 @@ class _Panel extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.cairo(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -1450,11 +1456,17 @@ class _Panel extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                subtitle,
-                style: GoogleFonts.cairo(
-                  fontSize: 13,
-                  color: colors.textSecondary,
+              Flexible(
+                flex: 0,
+                child: Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: GoogleFonts.cairo(
+                    fontSize: 13,
+                    color: colors.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -1490,9 +1502,8 @@ class _RepairCard extends StatelessWidget {
     final title = _cardTitle(card);
     final isReady = m.status == AppConstants.statusReady;
     final isWarrantyReturn = m.status == AppConstants.statusWarrantyReturn;
-    final buttonLabel = m.status == AppConstants.statusReady
-        ? 'تأكيد استلام العميل للجهاز'
-        : 'فتح الجهاز';
+    final buttonLabel =
+        m.status == AppConstants.statusReady ? 'تأكيد الاستلام' : 'فتح الجهاز';
     final problem = card.latestWarrantyProblem ?? m.faultDescription;
 
     return _HoverLift(
@@ -1638,7 +1649,7 @@ class _RepairCard extends StatelessWidget {
                 const SizedBox(height: 7),
                 Text(
                   problem,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.cairo(
                     fontSize: 13,
@@ -1650,7 +1661,7 @@ class _RepairCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     'القطعة المطلوبة: ${card.requiredParts.join('، ')}',
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.cairo(
                       fontSize: 12,
@@ -1683,13 +1694,15 @@ class _RepairCard extends StatelessWidget {
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
-                        child: Text(
-                          buttonLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.cairo(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            buttonLabel,
+                            maxLines: 1,
+                            style: GoogleFonts.cairo(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
@@ -1867,7 +1880,7 @@ class _CompactOutlinedAction extends StatelessWidget {
             label,
             maxLines: 1,
             softWrap: false,
-            overflow: TextOverflow.visible,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.cairo(
               fontSize: fontSize,
               fontWeight: FontWeight.w800,
@@ -3927,15 +3940,13 @@ class _ActionButton extends StatelessWidget {
               Icon(icon, size: 24),
               const SizedBox(width: 12),
             ],
-            Icon(icon, size: 22),
-            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 title,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.cairo(
-                  fontSize: 17,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -4217,7 +4228,7 @@ class _SmallBadge extends StatelessWidget {
         constraints: BoxConstraints(maxWidth: compact ? 164 : 240),
         child: Text(
           label,
-          maxLines: 1,
+          maxLines: compact ? 1 : 2,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.cairo(
             fontSize: compact ? 10.5 : 12,

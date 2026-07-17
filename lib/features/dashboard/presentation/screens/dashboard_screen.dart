@@ -159,41 +159,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Welcome header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final title = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'لوحة التحكم',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.headlineLarge,
                     ),
                     Text(
                       AppFormatters.date(DateTime.now()),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: colors.textSecondary,
                           ),
                     ),
                   ],
-                ),
-                ElevatedButton.icon(
+                );
+                final refresh = ElevatedButton.icon(
                   onPressed: _loadData,
                   icon: const Icon(Icons.refresh_rounded, size: 18),
                   label: Text('تحديث', style: GoogleFonts.cairo()),
-                ),
-              ],
+                );
+
+                if (constraints.maxWidth < 520) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      title,
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: refresh,
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: title),
+                    const SizedBox(width: 12),
+                    refresh,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
 
             // Top stats row
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.6,
-              physics: const NeverScrollableScrollPhysics(),
+            _ResponsiveStatsGrid(
               children: [
                 StatCard(
                   title: 'مبيعات اليوم',
@@ -237,13 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.6,
-              physics: const NeverScrollableScrollPhysics(),
+            _ResponsiveStatsGrid(
               children: [
                 StatCard(
                   title: 'ضمانات سارية',
@@ -286,73 +299,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 24),
 
             // Content row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Revenue Chart
-                Expanded(
-                  flex: 3,
-                  child: AppCard(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SectionHeader(title: 'الإيرادات - آخر 7 أيام'),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          height: 200,
-                          child: _RevenueChart(spots: _revenueSpots),
-                        ),
-                      ],
-                    ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final revenueCard = AppCard(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionHeader(title: 'الإيرادات - آخر 7 أيام'),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 200,
+                        child: _RevenueChart(spots: _revenueSpots),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                // Quick actions
-                SizedBox(
-                  width: 200,
-                  child: AppCard(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'إجراءات سريعة',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 16),
-                        _QuickActionButton(
-                          icon: Icons.build_rounded,
-                          label: 'صيانة جديدة',
-                          color: AppColors.warning,
-                          onTap: () => context.go('/maintenance/new'),
-                        ),
-                        const SizedBox(height: 10),
-                        _QuickActionButton(
-                          icon: Icons.person_add_rounded,
-                          label: 'عميل جديد',
-                          color: AppColors.primary,
-                          onTap: () => context.go('/customers/new'),
-                        ),
-                        const SizedBox(height: 10),
-                        _QuickActionButton(
-                          icon: Icons.receipt_rounded,
-                          label: 'فاتورة بيع',
-                          color: AppColors.success,
-                          onTap: () => context.go('/sales/new'),
-                        ),
-                        const SizedBox(height: 10),
-                        _QuickActionButton(
-                          icon: Icons.search_rounded,
-                          label: 'بحث شامل',
-                          color: AppColors.info,
-                          onTap: () => context.go('/search'),
-                        ),
-                      ],
-                    ),
+                );
+                final quickActions = AppCard(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'إجراءات سريعة',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      _QuickActionButton(
+                        icon: Icons.build_rounded,
+                        label: 'صيانة جديدة',
+                        color: AppColors.warning,
+                        onTap: () => context.go('/maintenance/new'),
+                      ),
+                      const SizedBox(height: 10),
+                      _QuickActionButton(
+                        icon: Icons.person_add_rounded,
+                        label: 'عميل جديد',
+                        color: AppColors.primary,
+                        onTap: () => context.go('/customers/new'),
+                      ),
+                      const SizedBox(height: 10),
+                      _QuickActionButton(
+                        icon: Icons.receipt_rounded,
+                        label: 'فاتورة بيع',
+                        color: AppColors.success,
+                        onTap: () => context.go('/sales/new'),
+                      ),
+                      const SizedBox(height: 10),
+                      _QuickActionButton(
+                        icon: Icons.search_rounded,
+                        label: 'بحث شامل',
+                        color: AppColors.info,
+                        onTap: () => context.go('/search'),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                );
+
+                if (constraints.maxWidth < 760) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      revenueCard,
+                      const SizedBox(height: 16),
+                      quickActions,
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: revenueCard),
+                    const SizedBox(width: 16),
+                    SizedBox(width: 220, child: quickActions),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
 
@@ -363,9 +388,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const SectionHeader(title: 'آخر عمليات الصيانة'),
+                      const Expanded(
+                        child: SectionHeader(title: 'آخر عمليات الصيانة'),
+                      ),
+                      const SizedBox(width: 8),
                       TextButton(
                         onPressed: () => context.go('/maintenance'),
                         child: Text('عرض الكل',
@@ -388,6 +415,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ResponsiveStatsGrid extends StatelessWidget {
+  final List<Widget> children;
+
+  const _ResponsiveStatsGrid({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = width < 520
+            ? 1
+            : width < 820
+                ? 2
+                : width < 1120
+                    ? 3
+                    : 4;
+        final aspectRatio = columns == 1
+            ? 1.9
+            : columns == 2
+                ? 1.45
+                : columns == 3
+                    ? 1.5
+                    : 1.6;
+
+        return GridView.count(
+          crossAxisCount: columns,
+          shrinkWrap: true,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: aspectRatio,
+          physics: const NeverScrollableScrollPhysics(),
+          children: children,
+        );
+      },
     );
   }
 }
@@ -543,11 +609,15 @@ class _MaintenanceRow extends StatelessWidget {
                 children: [
                   Text(
                     data['customer_name'] ?? 'عميل غير معروف',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.cairo(
                         fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   Text(
                     '${data['brand']} ${data['model']} - ${data['ticket_number']}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.cairo(
                         fontSize: 12, color: colors.textSecondary),
                   ),
@@ -555,13 +625,21 @@ class _MaintenanceRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            StatusBadge(label: statusLabel, color: statusColor),
+            Flexible(
+              flex: 0,
+              child: StatusBadge(label: statusLabel, color: statusColor),
+            ),
             const SizedBox(width: 12),
-            Text(
-              AppFormatters.currency(
-                  (data['total_cost'] as num?)?.toDouble() ?? 0),
-              style:
-                  GoogleFonts.cairo(fontWeight: FontWeight.w700, fontSize: 13),
+            Flexible(
+              flex: 0,
+              child: Text(
+                AppFormatters.currency(
+                    (data['total_cost'] as num?)?.toDouble() ?? 0),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    GoogleFonts.cairo(fontWeight: FontWeight.w700, fontSize: 13),
+              ),
             ),
           ],
         ),

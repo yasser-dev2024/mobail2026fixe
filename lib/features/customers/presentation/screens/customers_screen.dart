@@ -588,6 +588,8 @@ class _CustomerCardState extends State<_CustomerCard> {
                     const SizedBox(height: 2),
                     Text(
                       widget.customer.phone,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.cairo(
                         color: AppColors.lightTextSecondary,
                         fontSize: 12,
@@ -621,26 +623,33 @@ class _CustomerCardState extends State<_CustomerCard> {
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${widget.customer.totalSpent.toStringAsFixed(0)} ر.س',
-                    style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppColors.success,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 92),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${widget.customer.totalSpent.toStringAsFixed(0)} ر.س',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppColors.success,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${widget.customer.visitCount} زيارة',
-                    style: GoogleFonts.cairo(
-                      color: AppColors.lightTextSecondary,
-                      fontSize: 11,
+                    const SizedBox(height: 2),
+                    Text(
+                      '${widget.customer.visitCount} زيارة',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.cairo(
+                        color: AppColors.lightTextSecondary,
+                        fontSize: 11,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(width: 4),
               IconButton(
@@ -716,12 +725,17 @@ class _MiniStatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Text(
-        label,
-        style: GoogleFonts.cairo(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 128),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.cairo(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
         ),
       ),
     );

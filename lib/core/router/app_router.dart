@@ -37,6 +37,7 @@ import '../../features/media/presentation/screens/media_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/auth/presentation/screens/users_screen.dart';
 import '../../features/barcode/presentation/screens/barcode_scan_screen.dart';
+import '../../features/tracking/presentation/screens/tracking_screen.dart';
 import '../layout/main_layout.dart';
 
 class AppRouter {
@@ -54,6 +55,18 @@ class AppRouter {
       GoRoute(
         path: '/shop-setup',
         builder: (context, state) => const ShopSetupScreen(),
+      ),
+      GoRoute(
+        path: '/track',
+        builder: (context, state) => TrackingScreen(
+          initialCode: state.uri.queryParameters['code'],
+        ),
+      ),
+      GoRoute(
+        path: '/track/:code',
+        builder: (context, state) => TrackingScreen(
+          initialCode: state.pathParameters['code'],
+        ),
       ),
       ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),

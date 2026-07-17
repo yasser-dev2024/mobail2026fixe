@@ -7,6 +7,7 @@ class SettingsService {
   SettingsService._internal();
 
   static const defaultShopName = 'محل جوالات ProShop';
+  static const defaultTrackingBaseUrl = 'https://proshop.example.com/track';
 
   final DatabaseService _db = DatabaseService();
 
@@ -29,6 +30,22 @@ class SettingsService {
   String get tradeName => _cache['trade_name'] ?? '';
   String get shopWhatsapp => _cache['shop_whatsapp'] ?? '';
   String get mapUrl => _cache['map_url'] ?? '';
+  String get trackingBaseUrl {
+    final value = (_cache['tracking_base_url'] ?? '').trim();
+    if (value.isEmpty || _isUnsupportedTrackingUrl(value)) {
+      return defaultTrackingBaseUrl;
+    }
+    return value;
+  }
+
+  String get privacyPolicyUrl {
+    final value = (_cache['privacy_policy_url'] ?? '').trim();
+    if (_isLegacyExternalUrl(value)) return '';
+    return value;
+  }
+
+  String get privacyPolicyAcceptedVersion =>
+      _cache['privacy_policy_accepted_version'] ?? '';
   double get taxRate => double.tryParse(_cache['tax_rate'] ?? '0') ?? 0;
   String get currency => _cache['currency'] ?? 'ر.س';
   String get warrantyTerms => _cache['warranty_terms'] ?? '';
@@ -161,5 +178,17 @@ class SettingsService {
         .where((item) => item.isNotEmpty)
         .where((item) => seen.add(item))
         .toList(growable: false);
+  }
+
+  bool _isLegacyExternalUrl(String value) {
+    final legacyHost = ['war', 'shati', 'app.com'].join();
+    return value.toLowerCase().contains(legacyHost);
+  }
+
+  bool _isUnsupportedTrackingUrl(String value) {
+    final lower = value.toLowerCase();
+    return _isLegacyExternalUrl(lower) ||
+        lower.contains('proshop://') ||
+        lower.contains('proshop.local');
   }
 }

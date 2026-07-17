@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/database/database_service.dart';
 import '../../../../core/services/settings_service.dart';
@@ -21,6 +22,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
   static const _minimumSplashDuration = Duration(seconds: 6);
+  static const _privacyPolicyVersion = '2026-07-17.1';
 
   late final AnimationController _motionController;
   late final AnimationController _progressController;
@@ -101,6 +103,14 @@ class _SplashScreenState extends State<SplashScreen>
       }
 
       await _updateProgress(
+        0.72,
+        'مراجعة سياسة الخصوصية...',
+        'يلزم قبول سياسة الخصوصية قبل استخدام التطبيق.',
+      );
+      final privacyAccepted = await _ensurePrivacyAccepted(settings);
+      if (!privacyAccepted) return;
+
+      await _updateProgress(
         0.82,
         'تحضير الكاميرا...',
         'سيظهر طلب السماح بالكاميرا لتصوير حالة الجهاز عند الاستلام.',
@@ -132,6 +142,38 @@ class _SplashScreenState extends State<SplashScreen>
         _cameraState = _CameraPermissionState.failed;
       });
     }
+  }
+
+  Future<bool> _ensurePrivacyAccepted(SettingsService settings) async {
+    if (settings.privacyPolicyAcceptedVersion == _privacyPolicyVersion) {
+      return true;
+    }
+    if (!mounted) return false;
+
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _PrivacyPolicyDialog(
+        policyUrl: settings.privacyPolicyUrl,
+        onOpenPolicy: () => _openPrivacyPolicy(settings.privacyPolicyUrl),
+      ),
+    );
+    if (accepted != true) return false;
+
+    await settings.save({
+      'privacy_policy_accepted_version': _privacyPolicyVersion,
+      'privacy_policy_accepted_at':
+          DateTime.now().millisecondsSinceEpoch.toString(),
+    });
+    return true;
+  }
+
+  Future<void> _openPrivacyPolicy(String url) async {
+    final clean = url.trim();
+    if (clean.isEmpty) return;
+    final uri = Uri.tryParse(clean);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _requestCameraPermission() async {
@@ -505,6 +547,273 @@ class _LoadingPanel extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(delay: 380.ms, duration: 520.ms).slideY(begin: .18);
+  }
+}
+
+class _PrivacyPolicyDialog extends StatefulWidget {
+  final String policyUrl;
+  final VoidCallback onOpenPolicy;
+
+  const _PrivacyPolicyDialog({
+    required this.policyUrl,
+    required this.onOpenPolicy,
+  });
+
+  @override
+  State<_PrivacyPolicyDialog> createState() => _PrivacyPolicyDialogState();
+}
+
+class _PrivacyPolicyDialogState extends State<_PrivacyPolicyDialog> {
+  bool _agreed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final policyUrl = widget.policyUrl.trim();
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      backgroundColor: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF171B26),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white.withAlpha(22)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(150),
+                blurRadius: 42,
+                offset: const Offset(0, 24),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F6B52),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.privacy_tip_rounded,
+                        color: Color(0xFF8BE7BC),
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'سياسة الخصوصية',
+                        style: GoogleFonts.cairo(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'يرجى قراءة السياسة والموافقة عليها قبل استخدام التطبيق.',
+                  style: GoogleFonts.cairo(
+                    color: Colors.white.withAlpha(170),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(8),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withAlpha(18)),
+                  ),
+                  child: const Column(
+                    children: [
+                      _PrivacyBullet(
+                        text:
+                            'يجمع التطبيق فقط بيانات العمل التي يتم إدخالها داخل النظام مثل بيانات العملاء، الأجهزة، طلبات الصيانة، الفواتير، الضمان، الدفعات، الصور، وإعدادات المركز.',
+                      ),
+                      _PrivacyBullet(
+                        text:
+                            'تستخدم هذه البيانات لإدارة الصيانة، تتبع حالة الجهاز، إصدار الفواتير والضمانات، تجهيز التقارير، وإرسال رسائل واتساب المرتبطة بطلبات العملاء.',
+                      ),
+                      _PrivacyBullet(
+                        text:
+                            'تحفظ البيانات محلياً على جهازك داخل قاعدة بيانات التطبيق. أي نسخ احتياطي أو مزامنة أو مشاركة تتم بناءً على إعداداتك واستخدامك للميزة.',
+                      ),
+                      _PrivacyBullet(
+                        text:
+                            'عند استخدام واتساب، مشاركة PDF، الطباعة، الخرائط، الدفع، أو أي خدمة خارجية، قد ترسل بيانات محدودة لازمة لتنفيذ الطلب إلى تلك الخدمة.',
+                      ),
+                      _PrivacyBullet(
+                        text:
+                            'تستخدم صلاحيات الكاميرا، الصور، الملفات، الاتصال، والبلوتوث فقط عند طلب ميزة مرتبطة بها مثل تصوير الجهاز، اختيار رقم عميل، المسح، أو الطباعة.',
+                      ),
+                      _PrivacyBullet(
+                        text:
+                            'لا نبيع بيانات العملاء ولا نشاركها مع أطراف خارجية لأغراض تسويقية.',
+                      ),
+                      _PrivacyBullet(
+                        text:
+                            'يستطيع العميل طلب تصحيح بياناته أو حذفها أو الحصول على نسخة منها عبر المركز الذي يستخدم التطبيق، حسب الأنظمة والتعليمات المطبقة.',
+                      ),
+                      _PrivacyBullet(
+                        text:
+                            'مشغل التطبيق مسؤول عن صحة البيانات المدخلة، أخذ موافقات العملاء عند الحاجة، حماية الجهاز وكلمات المرور، وحفظ النسخ الاحتياطية. التطبيق أداة تنظيمية ولا يتحمل نتائج سوء الاستخدام أو تعطل الخدمات الخارجية.',
+                      ),
+                    ],
+                  ),
+                ),
+                if (policyUrl.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(8),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withAlpha(16)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'السياسة الكاملة متاحة عبر الرابط:',
+                          style: GoogleFonts.cairo(
+                            color: Colors.white.withAlpha(220),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          policyUrl,
+                          textDirection: TextDirection.ltr,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.cairo(
+                            color: const Color(0xFF54D48F),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: widget.onOpenPolicy,
+                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: Text(
+                      'فتح رابط سياسة الخصوصية',
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.w800),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF8BE7BC),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _agreed,
+                  activeColor: const Color(0xFF8BE7BC),
+                  checkColor: const Color(0xFF122019),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  onChanged: (value) {
+                    setState(() => _agreed = value ?? false);
+                  },
+                  title: Text(
+                    'أوافق على سياسة الخصوصية',
+                    style: GoogleFonts.cairo(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 54,
+                  child: FilledButton.icon(
+                    onPressed:
+                        _agreed ? () => Navigator.of(context).pop(true) : null,
+                    icon: const Icon(Icons.check_rounded),
+                    label: Text(
+                      'موافقة ومتابعة',
+                      style: GoogleFonts.cairo(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF8BE7BC),
+                      disabledBackgroundColor: Colors.white.withAlpha(22),
+                      foregroundColor: const Color(0xFF122019),
+                      disabledForegroundColor: Colors.white.withAlpha(90),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PrivacyBullet extends StatelessWidget {
+  final String text;
+
+  const _PrivacyBullet({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 11),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 9),
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: const BoxDecoration(
+                color: Color(0xFF8BE7BC),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.cairo(
+                color: Colors.white.withAlpha(210),
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                height: 1.65,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

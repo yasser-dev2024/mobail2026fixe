@@ -283,6 +283,7 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                     if (m.estimatedDelivery != null) ...[
                       const SizedBox(height: 8),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(Icons.schedule_rounded,
                               size: 14,
@@ -290,16 +291,18 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                                   ? AppColors.error
                                   : context.appColors.textSecondary),
                           const SizedBox(width: 4),
-                          Text(
-                            'الموعد المتوقع: ${_fmt(m.estimatedDelivery!)}',
-                            style: GoogleFonts.cairo(
-                              fontSize: 12,
-                              color: m.isOverdue
-                                  ? AppColors.error
-                                  : context.appColors.textSecondary,
-                              fontWeight: m.isOverdue
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
+                          Expanded(
+                            child: Text(
+                              'الموعد المتوقع: ${_fmt(m.estimatedDelivery!)}',
+                              style: GoogleFonts.cairo(
+                                fontSize: 12,
+                                color: m.isOverdue
+                                    ? AppColors.error
+                                    : context.appColors.textSecondary,
+                                fontWeight: m.isOverdue
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
                             ),
                           ),
                           if (m.isOverdue) ...[
@@ -324,14 +327,17 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                     if (m.deliveredAt != null) ...[
                       const SizedBox(height: 4),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Icon(Icons.check_circle_rounded,
                               size: 14, color: AppColors.success),
                           const SizedBox(width: 4),
-                          Text(
-                            'تاريخ التسليم: ${_fmt(m.deliveredAt!)}',
-                            style: GoogleFonts.cairo(
-                                fontSize: 12, color: AppColors.success),
+                          Expanded(
+                            child: Text(
+                              'تاريخ التسليم: ${_fmt(m.deliveredAt!)}',
+                              style: GoogleFonts.cairo(
+                                  fontSize: 12, color: AppColors.success),
+                            ),
                           ),
                         ],
                       ),
@@ -345,10 +351,9 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
               // ── QR code & label printing ───────────────────────────────────
               _SectionCard(
                 title: 'الباركود والطباعة',
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final qr = Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
@@ -358,30 +363,36 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                       child: QrImageView(
                         data: m.ticketNumber,
                         version: QrVersions.auto,
-                        size: 110,
+                        size: constraints.maxWidth < 360 ? 96 : 110,
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            m.ticketNumber,
-                            style: GoogleFonts.cairo(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${m.brand} ${m.model}',
-                            style: GoogleFonts.cairo(
-                                fontSize: 13,
-                                color: context.appColors.textSecondary),
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton.icon(
+                    );
+                    final details = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          m.ticketNumber,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${m.brand} ${m.model}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                              fontSize: 13,
+                              color: context.appColors.textSecondary),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: constraints.maxWidth < 420
+                              ? double.infinity
+                              : null,
+                          child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
@@ -389,13 +400,38 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                             onPressed: () => _printLabel(m),
                             icon: const Icon(Icons.print_rounded, size: 16),
                             label: Text('طباعة الملصق',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.cairo(
                                     fontWeight: FontWeight.w600)),
                           ),
+                        ),
+                      ],
+                    );
+
+                    if (constraints.maxWidth < 420) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: qr,
+                          ),
+                          const SizedBox(height: 12),
+                          details,
                         ],
-                      ),
-                    ),
-                  ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        qr,
+                        const SizedBox(width: 16),
+                        Expanded(child: details),
+                      ],
+                    );
+                  },
                 ),
               ),
 
@@ -962,19 +998,23 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
   Widget _buildJourneyProgress(MaintenanceModel m) {
     final colors = context.appColors;
     final currentIndex = AppConstants.maintenanceStageIndex(m.status);
-    return Row(
-      children: List.generate(AppConstants.visibleMaintenanceStageLabels.length,
-          (index) {
-        final active = index == currentIndex;
-        final label = AppConstants.visibleMaintenanceStageLabels[index];
-        return Expanded(
-          child: Row(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      reverse: true,
+      child: Row(
+        children: List.generate(
+            AppConstants.visibleMaintenanceStageLabels.length, (index) {
+          final active = index == currentIndex;
+          final label = AppConstants.visibleMaintenanceStageLabels[index];
+          return Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 104),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: active
                         ? AppColors.primary.withValues(alpha: 0.12)
@@ -988,7 +1028,8 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                     label,
                     textAlign: TextAlign.center,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.visible,
+                    softWrap: false,
                     style: GoogleFonts.cairo(
                       fontSize: 12,
                       fontWeight: active ? FontWeight.w700 : FontWeight.w500,
@@ -1007,9 +1048,9 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                   ),
                 ),
             ],
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 
@@ -1654,7 +1695,12 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
   Future<void> _showWhatsappMessageDialog(
     WhatsappMessageModel message,
   ) async {
-    final messageCtrl = TextEditingController(text: message.message);
+    final initialMessage = await _whatsappRepo.ensureRequiredTrackingLink(
+      message,
+      message.message,
+    );
+    if (!mounted) return;
+    final messageCtrl = TextEditingController(text: initialMessage);
     var sending = false;
     final sent = await showDialog<bool>(
       context: context,
@@ -2953,17 +2999,21 @@ class _SectionCard extends StatelessWidget {
           if (title != null) ...[
             Row(
               children: [
-                Text(
-                  title!,
-                  style: GoogleFonts.cairo(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: colors.textPrimary,
+                Expanded(
+                  child: Text(
+                    title!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
                   ),
                 ),
                 if (trailing != null) ...[
-                  const Spacer(),
-                  trailing!,
+                  const SizedBox(width: 8),
+                  Flexible(child: trailing!),
                 ],
               ],
             ),
@@ -2996,6 +3046,8 @@ class _InfoRow extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '$label: ',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.cairo(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -3005,6 +3057,7 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               value,
+              softWrap: true,
               style: GoogleFonts.cairo(fontSize: 13, color: colors.textPrimary),
             ),
           ),
@@ -3029,12 +3082,17 @@ class _StageBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
-      child: Text(
-        AppConstants.maintenanceStageLabel(status),
-        style: GoogleFonts.cairo(
-          fontSize: 12,
-          color: color,
-          fontWeight: FontWeight.w700,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 160),
+        child: Text(
+          AppConstants.maintenanceStageLabel(status),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.cairo(
+            fontSize: 12,
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -3067,9 +3125,21 @@ class _CostRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Text(label, style: style),
-          const Spacer(),
-          Text('${amount.toStringAsFixed(2)} ر.س', style: style),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${amount.toStringAsFixed(2)} ر.س',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
         ],
       ),
     );
@@ -3113,13 +3183,14 @@ class _PartRow extends StatelessWidget {
                 if (part.hasCostData)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Row(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
                       children: [
                         _miniChip(
                           'تكلفة: ${part.totalCost.toStringAsFixed(2)} ر.س',
                           AppColors.warning,
                         ),
-                        const SizedBox(width: 6),
                         _miniChip(
                           'ربح: ${part.totalProfit.toStringAsFixed(2)} ر.س',
                           part.totalProfit >= 0
@@ -3251,11 +3322,19 @@ class _PartsProfitSummary extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text(label,
-              style: GoogleFonts.cairo(fontSize: 12, color: secondaryColor)),
-          const Spacer(),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.cairo(fontSize: 12, color: secondaryColor),
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.cairo(
                 fontSize: bold ? 13 : 12,
                 fontWeight: bold ? FontWeight.w700 : FontWeight.w400,

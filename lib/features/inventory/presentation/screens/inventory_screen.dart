@@ -258,7 +258,7 @@ class _ProductGrid extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 220,
-        childAspectRatio: 0.75,
+        mainAxisExtent: 312,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -355,6 +355,8 @@ class _ProductCardState extends State<_ProductCard> {
               // Category label
               Text(
                 product.categoryLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.cairo(
                     fontSize: 10, color: colors.textSecondary),
               ),
@@ -374,12 +376,17 @@ class _ProductCardState extends State<_ProductCard> {
               const SizedBox(height: 4),
 
               // Sale price
-              Text(
-                '${product.salePrice.toStringAsFixed(0)} ر.س',
-                style: GoogleFonts.cairo(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  '${product.salePrice.toStringAsFixed(0)} ر.س',
+                  maxLines: 1,
+                  style: GoogleFonts.cairo(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
 
@@ -389,12 +396,16 @@ class _ProductCardState extends State<_ProductCard> {
                   padding: const EdgeInsets.only(top: 2),
                   child: Row(
                     children: [
-                      Text(
-                        'تكلفة: ${product.purchasePrice.toStringAsFixed(0)}',
-                        style: GoogleFonts.cairo(
-                            fontSize: 10, color: colors.textSecondary),
+                      Expanded(
+                        child: Text(
+                          'تكلفة: ${product.purchasePrice.toStringAsFixed(0)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                              fontSize: 10, color: colors.textSecondary),
+                        ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 5, vertical: 1),
@@ -586,17 +597,22 @@ class _StatCard extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 22),
             const SizedBox(height: 4),
-            Text(
-              value,
-              style: GoogleFonts.cairo(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: color,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: GoogleFonts.cairo(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
               ),
-              textAlign: TextAlign.center,
             ),
             Text(
               label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style:
                   GoogleFonts.cairo(fontSize: 10, color: colors.textSecondary),
               textAlign: TextAlign.center,

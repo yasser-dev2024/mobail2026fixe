@@ -31,6 +31,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _taxNumberCtrl = TextEditingController();
   final _whatsappCtrl = TextEditingController();
   final _mapUrlCtrl = TextEditingController();
+  final _trackingBaseUrlCtrl = TextEditingController();
+  final _privacyPolicyUrlCtrl = TextEditingController();
   final _taxRateCtrl = TextEditingController();
   final _currencyCtrl = TextEditingController();
   final _warrantyCtrl = TextEditingController();
@@ -87,6 +89,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _taxNumberCtrl.dispose();
     _whatsappCtrl.dispose();
     _mapUrlCtrl.dispose();
+    _trackingBaseUrlCtrl.dispose();
+    _privacyPolicyUrlCtrl.dispose();
     _taxRateCtrl.dispose();
     _currencyCtrl.dispose();
     _warrantyCtrl.dispose();
@@ -128,6 +132,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _taxNumberCtrl.text = _service.taxNumber;
       _whatsappCtrl.text = _service.shopWhatsapp;
       _mapUrlCtrl.text = _service.mapUrl;
+      _trackingBaseUrlCtrl.text = _service.trackingBaseUrl;
+      _privacyPolicyUrlCtrl.text = _service.privacyPolicyUrl;
       _taxRateCtrl.text = _service.taxRate.toString();
       _currencyCtrl.text = _service.currency;
       _warrantyCtrl.text = _service.warrantyTerms;
@@ -180,6 +186,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'tax_number': _taxNumberCtrl.text.trim(),
       'shop_whatsapp': _whatsappCtrl.text.trim(),
       'map_url': _mapUrlCtrl.text.trim(),
+      'tracking_base_url': _trackingBaseUrlCtrl.text.trim(),
+      'privacy_policy_url': _privacyPolicyUrlCtrl.text.trim(),
       'tax_rate': _taxRateCtrl.text.trim(),
       'currency':
           _currencyCtrl.text.trim().isEmpty ? 'ر.س' : _currencyCtrl.text.trim(),
@@ -386,6 +394,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           AppFormField(
               label: 'رابط الموقع على الخريطة', controller: _mapUrlCtrl),
+          const SizedBox(height: 12),
+          AppFormField(
+            label: 'رابط تتبع العميل',
+            controller: _trackingBaseUrlCtrl,
+            prefix: const Icon(Icons.link_rounded),
+          ),
+          const SizedBox(height: 12),
+          AppFormField(
+            label: 'رابط سياسة الخصوصية',
+            controller: _privacyPolicyUrlCtrl,
+            prefix: const Icon(Icons.privacy_tip_rounded),
+          ),
           const SizedBox(height: 12),
           AppFormField(label: 'البريد الإلكتروني', controller: _emailCtrl),
           const SizedBox(height: 12),

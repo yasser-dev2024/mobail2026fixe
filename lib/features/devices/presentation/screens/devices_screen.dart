@@ -311,6 +311,8 @@ class _DeviceCard extends StatelessWidget {
                   children: [
                     Text(
                       device.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.cairo(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
@@ -324,11 +326,15 @@ class _DeviceCard extends StatelessWidget {
                           const Icon(Icons.fingerprint,
                               size: 13, color: AppColors.lightTextSecondary),
                           const SizedBox(width: 3),
-                          Text(
-                            device.imei!,
-                            style: GoogleFonts.cairo(
-                              fontSize: 11,
-                              color: AppColors.lightTextSecondary,
+                          Expanded(
+                            child: Text(
+                              device.imei!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                color: AppColors.lightTextSecondary,
+                              ),
                             ),
                           ),
                         ],
@@ -389,12 +395,17 @@ class _Chip extends StatelessWidget {
         children: [
           Icon(icon, size: 11, color: AppColors.primary),
           const SizedBox(width: 3),
-          Text(
-            label,
-            style: GoogleFonts.cairo(
-              fontSize: 10,
-              color: AppColors.primary,
-              fontWeight: FontWeight.w500,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 110),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.cairo(
+                fontSize: 10,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],

@@ -8,6 +8,7 @@ import '../../../../core/database/database_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_widgets.dart';
+import '../../../tracking/data/tracking_service.dart';
 import '../../data/whatsapp_repository.dart';
 import '../../data/whatsapp_template_model.dart';
 
@@ -109,19 +110,34 @@ class _WhatsappScreenState extends State<WhatsappScreen> {
     }
     final customerName = row['customer_name'] as String? ?? 'عميلنا';
     final device = '${row['brand'] ?? ''} ${row['model'] ?? ''}'.trim();
+    final ticketNumber = row['ticket_number'] as String? ?? '';
+    final trackingUrl = await TrackingService().buildTrackingUrl(ticketNumber);
     final deliveryDate = _formatOptionalDate(row['estimated_delivery'] as int?);
     final warrantyEnd = _formatOptionalDate(row['warranty_end'] as int?);
     final variables = {
       'customer_name': customerName,
       'device': device.isEmpty ? 'جهازك' : device,
-      'ticket_number': row['ticket_number'] as String? ?? '',
+      'ticket_number': ticketNumber,
       'delivery_date': deliveryDate,
       'warranty_end': warrantyEnd,
       'status': _statusLabel(status),
+      'tracking_url': trackingUrl,
     };
 
-    final message = template?.buildMessage(variables) ??
-        'السلام عليكم $customerName،\nحالة جهازك ${variables['device']}: ${variables['status']}.\nرقم الصيانة: ${variables['ticket_number']}';
+    var message = _stripUnsupportedTrackingLinks(
+      template?.buildMessage(variables) ??
+          'السلام عليكم $customerName،\nحالة جهازك ${variables['device']}: ${variables['status']}.\nرقم الصيانة: ${variables['ticket_number']}',
+    );
+    if (_shouldAppendTrackingUrl(status, message, trackingUrl)) {
+      message = [
+        'رابط تتبع حالة الجهاز مباشرة بدون إدخال:',
+        trackingUrl,
+        '',
+        'رقم الطلب: $ticketNumber',
+        '',
+        message.trim(),
+      ].join('\n');
+    }
 
     return _WhatsappPrefill(
       phone: (row['customer_phone'] as String?) ??
@@ -154,6 +170,44 @@ class _WhatsappScreenState extends State<WhatsappScreen> {
       default:
         return AppConstants.waTplReceived;
     }
+  }
+
+  bool _shouldAppendTrackingUrl(
+    String status,
+    String message,
+    String trackingUrl,
+  ) {
+    if (trackingUrl.isEmpty || message.contains(trackingUrl)) return false;
+    return status == AppConstants.statusNew ||
+        status == AppConstants.statusWaitingInspection;
+  }
+
+  String _stripUnsupportedTrackingLinks(String text) {
+    final lines = text.trim().split('\n');
+    final cleaned = <String>[];
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final next = i + 1 < lines.length ? lines[i + 1] : '';
+      if (_isUnsupportedTrackingLine(line)) {
+        if (cleaned.isNotEmpty && cleaned.last.contains('رابط تتبع')) {
+          cleaned.removeLast();
+        }
+        continue;
+      }
+      if (line.contains('رابط تتبع') && _isUnsupportedTrackingLine(next)) {
+        continue;
+      }
+      cleaned.add(line);
+    }
+    return cleaned.join('\n').trim();
+  }
+
+  bool _isUnsupportedTrackingLine(String value) {
+    final lower = value.toLowerCase();
+    final legacyHost = ['war', 'shati', 'app.com'].join();
+    return lower.contains(legacyHost) ||
+        lower.contains('proshop://') ||
+        lower.contains('proshop.local');
   }
 
   String _statusLabel(String status) {

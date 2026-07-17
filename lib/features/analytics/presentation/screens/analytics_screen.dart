@@ -15,6 +15,8 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final _db = DatabaseService();
   List<Map<String, dynamic>> _faults = [];
+  List<Map<String, dynamic>> _deviceModels = [];
+  List<Map<String, dynamic>> _deviceBrands = [];
   List<Map<String, dynamic>> _lowStock = [];
   List<Map<String, dynamic>> _repeatCustomers = [];
   List<Map<String, dynamic>> _technicians = [];
@@ -29,11 +31,33 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Future<void> _load() async {
     final shopId = await _db.getCurrentShopId();
     final faults = await _db.rawQuery('''
-      SELECT fault_description, COUNT(*) AS count
+      SELECT TRIM(fault_description) AS fault_description, COUNT(*) AS count
       FROM maintenance
-      WHERE shop_id = ? AND deleted_at IS NULL
-      GROUP BY fault_description
-      HAVING count > 1
+      WHERE shop_id = ?
+        AND deleted_at IS NULL
+        AND TRIM(IFNULL(fault_description, '')) != ''
+      GROUP BY LOWER(TRIM(fault_description))
+      ORDER BY count DESC
+      LIMIT 10
+    ''', [shopId]);
+    final deviceModels = await _db.rawQuery('''
+      SELECT TRIM(brand) AS brand, TRIM(model) AS model, COUNT(*) AS count
+      FROM maintenance
+      WHERE shop_id = ?
+        AND deleted_at IS NULL
+        AND TRIM(IFNULL(brand, '')) != ''
+        AND TRIM(IFNULL(model, '')) != ''
+      GROUP BY LOWER(TRIM(brand)), LOWER(TRIM(model))
+      ORDER BY count DESC
+      LIMIT 10
+    ''', [shopId]);
+    final deviceBrands = await _db.rawQuery('''
+      SELECT TRIM(brand) AS brand, COUNT(*) AS count
+      FROM maintenance
+      WHERE shop_id = ?
+        AND deleted_at IS NULL
+        AND TRIM(IFNULL(brand, '')) != ''
+      GROUP BY LOWER(TRIM(brand))
       ORDER BY count DESC
       LIMIT 10
     ''', [shopId]);
@@ -67,6 +91,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     if (!mounted) return;
     setState(() {
       _faults = faults;
+      _deviceModels = deviceModels;
+      _deviceBrands = deviceBrands;
       _lowStock = lowStock;
       _repeatCustomers = repeatCustomers;
       _technicians = technicians;
@@ -86,35 +112,63 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: StatCard(
-                          title: 'أعطال متكررة',
-                          value: '${_faults.length}',
-                          icon: Icons.psychology_rounded,
-                          gradient: AppColors.primaryGradient,
+                  SizedBox(
+                    height: 158,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: StatCard(
+                            title: 'أكثر عطل',
+                            value: _faults.isEmpty
+                                ? '0'
+                                : '${_faults.first['count'] ?? 0}',
+                            icon: Icons.psychology_rounded,
+                            gradient: AppColors.primaryGradient,
+                            subtitle: _faults.isEmpty
+                                ? 'لا توجد بيانات'
+                                : _faults.first['fault_description'] as String?,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: StatCard(
-                          title: 'قطع حرجة',
-                          value: '${_lowStock.length}',
-                          icon: Icons.warning_rounded,
-                          gradient: AppColors.warningGradient,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: StatCard(
+                            title: 'أكثر شركة',
+                            value: _deviceBrands.isEmpty
+                                ? '0'
+                                : '${_deviceBrands.first['count'] ?? 0}',
+                            icon: Icons.business_rounded,
+                            gradient: AppColors.tealGradient,
+                            subtitle: _deviceBrands.isEmpty
+                                ? 'لا توجد بيانات'
+                                : _deviceBrands.first['brand'] as String?,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: StatCard(
-                          title: 'عملاء متكررون',
-                          value: '${_repeatCustomers.length}',
-                          icon: Icons.people_alt_rounded,
-                          gradient: AppColors.tealGradient,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: StatCard(
+                            title: 'أكثر موديل',
+                            value: _deviceModels.isEmpty
+                                ? '0'
+                                : '${_deviceModels.first['count'] ?? 0}',
+                            icon: Icons.phone_android_rounded,
+                            gradient: AppColors.infoGradient,
+                            subtitle: _deviceModels.isEmpty
+                                ? 'لا توجد بيانات'
+                                : '${_deviceModels.first['brand'] ?? ''} ${_deviceModels.first['model'] ?? ''}'
+                                    .trim(),
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: StatCard(
+                            title: 'قطع حرجة',
+                            value: '${_lowStock.length}',
+                            icon: Icons.warning_rounded,
+                            gradient: AppColors.warningGradient,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -145,6 +199,41 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                     title: row['name'] as String? ?? '',
                                     value: '${row['quantity'] ?? 0} متبقي',
                                     icon: Icons.inventory_2_rounded,
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _InsightCard(
+                          title: 'أكثر الأجهزة صيانة',
+                          empty: 'لا توجد بيانات أجهزة كافية',
+                          rows: _deviceModels
+                              .map((row) => _InsightRow(
+                                    title:
+                                        '${row['brand'] ?? ''} ${row['model'] ?? ''}'
+                                            .trim(),
+                                    value: '${row['count'] ?? 0} مرات',
+                                    icon: Icons.phone_android_rounded,
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _InsightCard(
+                          title: 'أكثر الشركات صيانة',
+                          empty: 'لا توجد بيانات شركات كافية',
+                          rows: _deviceBrands
+                              .map((row) => _InsightRow(
+                                    title: row['brand'] as String? ?? '',
+                                    value: '${row['count'] ?? 0} مرات',
+                                    icon: Icons.business_rounded,
                                   ))
                               .toList(),
                         ),

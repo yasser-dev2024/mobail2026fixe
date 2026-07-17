@@ -6,6 +6,7 @@ import '../../../core/services/document_share_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/whatsapp_launcher.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../tracking/data/tracking_service.dart';
 import '../../warranty/services/warranty_pdf_service.dart';
 import 'whatsapp_message_model.dart';
 import 'whatsapp_template_model.dart';
@@ -14,13 +15,11 @@ class _WhatsappPdfAttachment {
   final String documentTitle;
   final String filePrefix;
   final String note;
-  final bool intakeAcknowledgement;
 
   const _WhatsappPdfAttachment({
     required this.documentTitle,
     required this.filePrefix,
     required this.note,
-    this.intakeAcknowledgement = false,
   });
 }
 
@@ -88,6 +87,13 @@ class WhatsappRepository {
     if (latest != null &&
         (latest.status == statusPrepared || latest.status == statusFailed) &&
         _isMessageTypeCurrentForStatus(latest.messageType, data)) {
+      if (await _messageNeedsRefresh(latest, data)) {
+        return prepareMaintenanceMessage(
+          maintenanceId,
+          latest.messageType,
+          forceNew: true,
+        );
+      }
       return latest;
     }
     final type = await _messageTypeForStatus(data);
@@ -113,7 +119,8 @@ class WhatsappRepository {
       if (existing != null &&
           (existing.status == statusPrepared ||
               existing.status == statusSent)) {
-        return existing;
+        final needsRefresh = await _messageNeedsRefresh(existing, data);
+        if (!needsRefresh) return existing;
       }
     }
 
@@ -138,6 +145,72 @@ class WhatsappRepository {
     );
     await _db.insert('whatsapp_messages', model.toMap());
     return model;
+  }
+
+  Future<bool> _messageNeedsRefresh(
+    WhatsappMessageModel message,
+    Map<String, dynamic> data,
+  ) async {
+    if (message.messageType != AppConstants.waMsgReceived) return false;
+    final trackingUrl =
+        await TrackingService().buildTrackingUrl(_text(data['ticket_number']));
+    return trackingUrl.isNotEmpty && !message.message.contains(trackingUrl);
+  }
+
+  Future<String> ensureRequiredTrackingLink(
+    WhatsappMessageModel message,
+    String text,
+  ) async {
+    final cleanText = _stripUnsupportedTrackingLinks(text.trim());
+    if (message.messageType != AppConstants.waMsgReceived) {
+      return cleanText;
+    }
+
+    final data = await _loadMaintenanceMessageData(message.maintenanceId);
+    if (data == null) return cleanText;
+
+    final ticket = _text(data['ticket_number']);
+    final trackingUrl = await TrackingService().buildTrackingUrl(ticket);
+    if (trackingUrl.isEmpty || cleanText.contains(trackingUrl)) {
+      return cleanText;
+    }
+
+    return [
+      'رابط تتبع حالة الجهاز مباشرة بدون إدخال:',
+      trackingUrl,
+      '',
+      'رقم الطلب: $ticket',
+      '',
+      cleanText,
+    ].join('\n');
+  }
+
+  String _stripUnsupportedTrackingLinks(String text) {
+    final lines = text.split('\n');
+    final cleaned = <String>[];
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final next = i + 1 < lines.length ? lines[i + 1] : '';
+      if (_isUnsupportedTrackingLine(line)) {
+        if (cleaned.isNotEmpty && cleaned.last.contains('رابط تتبع')) {
+          cleaned.removeLast();
+        }
+        continue;
+      }
+      if (line.contains('رابط تتبع') && _isUnsupportedTrackingLine(next)) {
+        continue;
+      }
+      cleaned.add(line);
+    }
+    return cleaned.join('\n').trim();
+  }
+
+  bool _isUnsupportedTrackingLine(String value) {
+    final lower = value.toLowerCase();
+    final legacyHost = ['war', 'shati', 'app.com'].join();
+    return lower.contains(legacyHost) ||
+        lower.contains('proshop://') ||
+        lower.contains('proshop.local');
   }
 
   Future<void> prepareAndMaybeAutoSend(
@@ -254,14 +327,17 @@ WHERE w.is_void = 0
     required String message,
     String? sentBy,
   }) async {
-    final cleanMessage = message.trim();
-    if (cleanMessage.isEmpty) {
-      throw Exception('نص الرسالة فارغ');
-    }
-
     final model = await getMessageById(messageId);
     if (model == null) {
       throw Exception('رسالة WhatsApp غير موجودة');
+    }
+
+    final cleanMessage = await ensureRequiredTrackingLink(
+      model,
+      message,
+    );
+    if (cleanMessage.isEmpty) {
+      throw Exception('نص الرسالة فارغ');
     }
 
     final normalizedPhone = normalizePhone(model.phone);
@@ -343,7 +419,6 @@ WHERE w.is_void = 0
       model.maintenanceId,
       documentTitle: attachment.documentTitle,
       filePrefix: attachment.filePrefix,
-      intakeAcknowledgement: attachment.intakeAcknowledgement,
     );
     final messageWithNote = [
       message,
@@ -360,12 +435,7 @@ WHERE w.is_void = 0
   _WhatsappPdfAttachment? _pdfAttachmentFor(String messageType) {
     switch (messageType) {
       case AppConstants.waMsgReceived:
-        return const _WhatsappPdfAttachment(
-          documentTitle: 'إقرار استلام وشروط ضمان',
-          filePrefix: 'IntakeWarranty',
-          note: 'مرفق ملف PDF لإقرار الاستلام وشروط الضمان.',
-          intakeAcknowledgement: true,
-        );
+        return null;
       case AppConstants.waMsgDelivered:
         return const _WhatsappPdfAttachment(
           documentTitle: 'وثيقة ضمان الصيانة',
@@ -532,6 +602,7 @@ LIMIT 1
     final model = _text(data['model']);
     final device = _fallback('$brand $model'.trim(), 'الجهاز');
     final ticket = _text(data['ticket_number']);
+    final trackingUrl = await TrackingService().buildTrackingUrl(ticket);
     final repairDetails = _repairDetails(data);
     final cost = _money(_num(data['total_cost']));
     final warrantyDays = _warrantyDays(data);
@@ -550,6 +621,11 @@ LIMIT 1
         return [
           'مرحباً $name،',
           '',
+          if (trackingUrl.isNotEmpty) ...[
+            'رابط تتبع حالة الجهاز مباشرة بدون إدخال:',
+            trackingUrl,
+            '',
+          ],
           'تم استلام جهازكم بنجاح.',
           '',
           'الجهاز: $device',

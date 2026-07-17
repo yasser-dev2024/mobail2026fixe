@@ -252,21 +252,31 @@ class _MaintenanceCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              item.ticketNumber,
-                              style: GoogleFonts.cairo(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
+                            Expanded(
+                              child: Text(
+                                item.ticketNumber,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
                               ),
                             ),
-                            const Spacer(),
-                            _StatusBadge(label: stageLabel, color: statusColor),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              flex: 0,
+                              child: _StatusBadge(
+                                  label: stageLabel, color: statusColor),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Text(
                           item.customerName ?? 'عميل غير محدد',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.cairo(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -276,6 +286,8 @@ class _MaintenanceCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           '${item.brand} ${item.model}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.cairo(
                             fontSize: 13,
                             color: colors.textSecondary,
@@ -285,6 +297,8 @@ class _MaintenanceCard extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             item.customerPhone!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.cairo(
                               fontSize: 12,
                               color: colors.textSecondary,
@@ -307,23 +321,33 @@ class _MaintenanceCard extends StatelessWidget {
                             Icon(Icons.calendar_today_rounded,
                                 size: 13, color: colors.textSecondary),
                             const SizedBox(width: 4),
-                            Text(
-                              dateStr,
-                              style: GoogleFonts.cairo(
-                                  fontSize: 12, color: colors.textSecondary),
+                            Flexible(
+                              child: Text(
+                                dateStr,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.cairo(
+                                    fontSize: 12, color: colors.textSecondary),
+                              ),
                             ),
                             const SizedBox(width: 10),
-                            Text(
-                              _elapsedLabel(
-                                  item.status == AppConstants.statusReady
-                                      ? item.updatedAt
-                                      : item.receivedAt),
-                              style: GoogleFonts.cairo(
-                                  fontSize: 12, color: colors.textSecondary),
+                            Flexible(
+                              child: Text(
+                                _elapsedLabel(
+                                    item.status == AppConstants.statusReady
+                                        ? item.updatedAt
+                                        : item.receivedAt),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.cairo(
+                                    fontSize: 12, color: colors.textSecondary),
+                              ),
                             ),
                             const Spacer(),
                             Text(
                               '${item.totalCost.toStringAsFixed(0)} ر.س',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.cairo(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -341,6 +365,8 @@ class _MaintenanceCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text(
                                 'متأخر عن الموعد',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.cairo(
                                   fontSize: 11,
                                   color: AppColors.warning,
@@ -499,12 +525,17 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
-      child: Text(
-        label,
-        style: GoogleFonts.cairo(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 132),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.cairo(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
       ),
     );
