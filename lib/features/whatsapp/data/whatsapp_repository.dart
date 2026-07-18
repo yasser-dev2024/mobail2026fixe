@@ -176,12 +176,39 @@ class WhatsappRepository {
     }
 
     return [
-      'رابط تتبع حالة الجهاز مباشرة بدون إدخال:',
+      'رابط تتبع الجهاز:',
       trackingUrl,
       '',
-      'رقم الطلب: $ticket',
-      '',
       cleanText,
+    ].join('\n');
+  }
+
+  static String buildReceivedCustomerMessage({
+    required String customerName,
+    required String trackingUrl,
+    required String receivedDate,
+    required String device,
+    required String problem,
+  }) {
+    final name =
+        customerName.trim().isEmpty ? 'عميلنا العزيز' : customerName.trim();
+    final cleanDevice = device.trim().isEmpty ? 'غير محدد' : device.trim();
+    final cleanProblem = problem.trim().isEmpty ? 'غير محددة' : problem.trim();
+    return [
+      'مرحباً $name،',
+      '',
+      if (trackingUrl.trim().isNotEmpty) ...[
+        'رابط تتبع الجهاز:',
+        trackingUrl.trim(),
+        '',
+      ],
+      'تاريخ الاستلام: $receivedDate',
+      '',
+      'نوع الجوال: $cleanDevice',
+      '',
+      'المشكلة: $cleanProblem',
+      '',
+      'شكراً لثقتكم بنا، سنعتني بجهازكم ونبقيكم على اطلاع حتى اكتمال الصيانة بإذن الله.',
     ].join('\n');
   }
 
@@ -191,13 +218,13 @@ class WhatsappRepository {
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       final next = i + 1 < lines.length ? lines[i + 1] : '';
-      if (_isUnsupportedTrackingLine(line)) {
+      if (isUnsupportedTrackingLink(line)) {
         if (cleaned.isNotEmpty && cleaned.last.contains('رابط تتبع')) {
           cleaned.removeLast();
         }
         continue;
       }
-      if (line.contains('رابط تتبع') && _isUnsupportedTrackingLine(next)) {
+      if (line.contains('رابط تتبع') && isUnsupportedTrackingLink(next)) {
         continue;
       }
       cleaned.add(line);
@@ -205,12 +232,13 @@ class WhatsappRepository {
     return cleaned.join('\n').trim();
   }
 
-  bool _isUnsupportedTrackingLine(String value) {
+  static bool isUnsupportedTrackingLink(String value) {
     final lower = value.toLowerCase();
     final legacyHost = ['war', 'shati', 'app.com'].join();
     return lower.contains(legacyHost) ||
-        lower.contains('proshop://') ||
-        lower.contains('proshop.local');
+        lower.contains('proshop.example.com') ||
+        lower.contains('proshop.local') ||
+        lower.startsWith('proshop://');
   }
 
   Future<void> prepareAndMaybeAutoSend(
@@ -618,26 +646,13 @@ LIMIT 1
 
     switch (messageType) {
       case AppConstants.waMsgReceived:
-        return [
-          'مرحباً $name،',
-          '',
-          if (trackingUrl.isNotEmpty) ...[
-            'رابط تتبع حالة الجهاز مباشرة بدون إدخال:',
-            trackingUrl,
-            '',
-          ],
-          'تم استلام جهازكم بنجاح.',
-          '',
-          'الجهاز: $device',
-          '',
-          'رقم الطلب: $ticket',
-          '',
-          'المشكلة المسجلة: ${_fallback(_text(data['fault_description']), 'غير محددة')}',
-          '',
-          'تاريخ الاستلام: ${_date(_int(data['received_at']))}',
-          '',
-          'سنقوم بالتواصل معكم فور الانتهاء من الصيانة.',
-        ].join('\n');
+        return buildReceivedCustomerMessage(
+          customerName: name,
+          trackingUrl: trackingUrl,
+          receivedDate: _date(_int(data['received_at'])),
+          device: device,
+          problem: _text(data['fault_description']),
+        );
       case AppConstants.waMsgReady:
         return [
           'مرحباً $name،',

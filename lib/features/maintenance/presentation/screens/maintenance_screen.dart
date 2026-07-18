@@ -185,16 +185,17 @@ class _MaintenanceCard extends StatelessWidget {
   }
 
   // Returns the alert color + tooltip when a card needs attention.
-  // Priority: abandoned (red) > warranty expiring (orange) > waiting part (purple)
+  // Priority: device stayed 2+ days (red) > warranty expiring (orange) > waiting part (purple)
   ({Color color, String tooltip})? get _alert {
-    if (item.status == AppConstants.statusReady) {
+    if (item.status != AppConstants.statusDelivered &&
+        item.status != AppConstants.statusCancelled) {
       final days = DateTime.now()
-          .difference(DateTime.fromMillisecondsSinceEpoch(item.updatedAt))
+          .difference(DateTime.fromMillisecondsSinceEpoch(item.receivedAt))
           .inDays;
-      if (days > 3) {
+      if (days >= 2) {
         return (
           color: AppColors.error,
-          tooltip: 'جهاز متروك منذ $days أيام',
+          tooltip: 'الجوال في المحل منذ $days يوم'
         );
       }
     }
@@ -202,11 +203,9 @@ class _MaintenanceCard extends StatelessWidget {
         item.warrantyType != null &&
         item.warrantyType != 'none') {
       final end = DateTime.fromMillisecondsSinceEpoch(item.warrantyEnd!);
-      final daysLeft = end.difference(DateTime.now()).inDays;
-      if (daysLeft >= 0 && daysLeft <= 7) {
-        final msg = daysLeft == 0
-            ? 'الضمان ينتهي اليوم!'
-            : 'الضمان ينتهي خلال $daysLeft يوم';
+      final daysLeft = _calendarDaysUntil(end);
+      if (daysLeft == 1 || daysLeft == 2) {
+        final msg = daysLeft == 1 ? 'الضمان ينتهي غداً' : 'الضمان ينتهي بعد غد';
         return (color: AppColors.warning, tooltip: msg);
       }
     }
@@ -214,6 +213,19 @@ class _MaintenanceCard extends StatelessWidget {
       return (color: Colors.purple, tooltip: 'بانتظار قطعة غيار');
     }
     return null;
+  }
+
+  int _calendarDaysUntil(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    return target.difference(today).inDays;
+  }
+
+  String _dateLabel(int? ms) {
+    if (ms == null) return 'غير محدد';
+    final date = DateTime.fromMillisecondsSinceEpoch(ms);
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override
@@ -374,6 +386,39 @@ class _MaintenanceCard extends StatelessWidget {
                                 ),
                               ),
                             ],
+                          ),
+                        ],
+                        if (item.warrantyExpiryApproved) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.error.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.gpp_bad_rounded,
+                                    size: 16, color: AppColors.error),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'انتهى الضمان - النهاية: ${_dateLabel(item.warrantyEnd)} - الاعتماد: ${_dateLabel(item.warrantyExpiryApprovedAt)}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ],
