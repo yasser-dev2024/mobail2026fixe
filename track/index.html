@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>تتبع صيانة جهازك</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#effaf5;color:#142238;font-family:Tahoma,Arial,sans-serif}.wrap{max-width:760px;margin:auto;padding:18px}.hero,.status,.card{border-radius:24px;padding:22px;margin-bottom:16px}.hero{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,#08a97e,#087257);color:#fff}.logo{width:66px;height:66px;border-radius:18px;background:#fff;color:#08a97e;display:grid;place-items:center;font-size:38px;font-weight:bold}.hero h1{margin:0 0 8px}.hero p{margin:0}.status{background:linear-gradient(135deg,#10b981,#07936e);color:#fff}.status h2{font-size:30px;margin:8px 0}.card{background:#fff;box-shadow:0 10px 30px #08725718}.card h3{margin-top:0}.row{display:flex;justify-content:space-between;gap:15px;padding:14px 0;border-bottom:1px solid #e7eeeb}.row:last-child{border:0}.row span{color:#65748a}footer{text-align:center;color:#087257;font-weight:bold;padding:12px}@media(max-width:520px){.wrap{padding:12px}.row{flex-direction:column;gap:6px}.hero h1{font-size:23px}}
+  </style>
+</head>
+<body><main class="wrap">
+  <section class="hero"><div class="logo">✓</div><div><h1>تتبع صيانة جهازك</h1><p>صفحة العميل المستقلة</p></div></section>
+  <section class="status"><small>الحالة الحالية</small><h2 id="status">تم استلام الجهاز</h2><p>رقم الطلب: <b id="ticket">—</b></p></section>
+  <section class="card"><h3>بيانات الجهاز</h3><div class="row"><span>نوع الجوال</span><b id="device">غير محدد</b></div><div class="row"><span>المشكلة</span><b id="problem">غير محددة</b></div><div class="row"><span>تاريخ الاستلام</span><b id="received">غير محدد</b></div></section>
+  <footer>شكراً لثقتكم بنا، نسعد بخدمتكم دائماً.</footer>
+</main><script>
+const p=new URLSearchParams(location.search);for(const k of ['ticket','status','device','problem','received']){const v=p.get(k);if(v)document.getElementById(k).textContent=v}
+  </script></body>
+</html>
