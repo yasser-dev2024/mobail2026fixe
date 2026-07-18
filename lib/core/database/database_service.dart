@@ -70,6 +70,7 @@ class DatabaseService {
     _createMaintenanceImagesTable(batch);
     _createWarrantyTable(batch);
     _createWarrantyClaimsTable(batch);
+    _createWarrantyActionsTable(batch);
     _createProductsTable(batch);
     _createSuppliersTable(batch);
     _createPurchasesTable(batch);
@@ -159,6 +160,9 @@ class DatabaseService {
     }
     if (oldVersion < 9) {
       await _ensureNotificationShopScope(db);
+    }
+    if (oldVersion < 10) {
+      await _ensureWarrantyManagementSchema(db);
     }
   }
 
@@ -380,6 +384,13 @@ class DatabaseService {
       end_date INTEGER NOT NULL,
       notes TEXT,
       is_void INTEGER NOT NULL DEFAULT 0,
+      alert_disabled INTEGER NOT NULL DEFAULT 0,
+      alert_disabled_reason TEXT,
+      alert_disabled_at INTEGER,
+      alert_disabled_by TEXT,
+      expiry_approved INTEGER NOT NULL DEFAULT 0,
+      expiry_approved_at INTEGER,
+      expiry_approved_by TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (maintenance_id) REFERENCES maintenance(id)
@@ -403,6 +414,29 @@ class DatabaseService {
       resolved_at INTEGER,
       FOREIGN KEY (warranty_id) REFERENCES warranties(id)
     )''');
+  }
+
+  void _createWarrantyActionsTable(Batch batch) {
+    batch.execute('''CREATE TABLE IF NOT EXISTS warranty_actions (
+      id TEXT PRIMARY KEY,
+      shop_id TEXT NOT NULL DEFAULT 'default_shop',
+      warranty_id TEXT NOT NULL,
+      maintenance_id TEXT,
+      action TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      user_id TEXT,
+      username TEXT,
+      notes TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (warranty_id) REFERENCES warranties(id)
+    )''');
+    batch.execute(
+        'CREATE INDEX IF NOT EXISTS idx_wactions_warranty ON warranty_actions(warranty_id)');
+    batch.execute(
+        'CREATE INDEX IF NOT EXISTS idx_wactions_shop ON warranty_actions(shop_id)');
+    batch.execute(
+        'CREATE INDEX IF NOT EXISTS idx_wactions_created ON warranty_actions(created_at)');
   }
 
   void _createProductsTable(Batch batch) {
@@ -873,7 +907,8 @@ class DatabaseService {
       'license_number': '',
       'shop_whatsapp': '',
       'map_url': '',
-      'tracking_base_url': 'https://proshop.example.com/track',
+      'tracking_base_url':
+          'https://yasser-dev2024.github.io/mobail2026fixe/track/?ticket={ticket}',
       'privacy_policy_url': '',
       'privacy_policy_accepted_version': '',
       'privacy_policy_accepted_at': '',
@@ -905,6 +940,9 @@ class DatabaseService {
       'photo_report_images_per_page': '4',
       'photo_show_employee': 'true',
       'photo_show_datetime': 'true',
+      'alert_sounds_enabled': 'true',
+      'device_stay_alert_sound_path': '',
+      'warranty_alert_sound_path': '',
     };
     for (final entry in defaults.entries) {
       batch.insert(
@@ -1063,6 +1101,7 @@ class DatabaseService {
       'device_reports',
       'backup_logs',
       'notifications',
+      'warranty_actions',
     ]) {
       try {
         await db.update(
@@ -1148,6 +1187,43 @@ class DatabaseService {
         "UPDATE warranty_claims SET shop_id = ? "
         "WHERE shop_id IS NULL OR shop_id = '' OR shop_id = 'default_shop'",
         [setupAt > 0 ? legacyShopId : shopId],
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _ensureWarrantyManagementSchema(Database db) async {
+    for (final column in const [
+      "alert_disabled INTEGER NOT NULL DEFAULT 0",
+      "alert_disabled_reason TEXT",
+      "alert_disabled_at INTEGER",
+      "alert_disabled_by TEXT",
+      "expiry_approved INTEGER NOT NULL DEFAULT 0",
+      "expiry_approved_at INTEGER",
+      "expiry_approved_by TEXT",
+    ]) {
+      try {
+        await db.execute('ALTER TABLE warranties ADD COLUMN $column');
+      } catch (_) {
+        // Column may already exist on development databases.
+      }
+    }
+
+    final batch = db.batch();
+    _createWarrantyActionsTable(batch);
+    await batch.commit(noResult: true);
+
+    await _ensureLocalShopIdentity(db);
+    final shopId = await _readSettingFromDb(db, 'shop_id') ?? 'default_shop';
+    try {
+      await db.rawUpdate(
+        "UPDATE warranty_actions SET shop_id = ("
+        "SELECT shop_id FROM warranties WHERE warranties.id = warranty_actions.warranty_id"
+        ") WHERE shop_id IS NULL OR shop_id = '' OR shop_id = 'default_shop'",
+      );
+      await db.rawUpdate(
+        "UPDATE warranty_actions SET shop_id = ? "
+        "WHERE shop_id IS NULL OR shop_id = '' OR shop_id = 'default_shop'",
+        [shopId],
       );
     } catch (_) {}
   }

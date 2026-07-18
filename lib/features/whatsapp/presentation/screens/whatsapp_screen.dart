@@ -84,6 +84,8 @@ class _WhatsappScreenState extends State<WhatsappScreen> {
         m.brand,
         m.model,
         m.status,
+        m.received_at,
+        m.fault_description,
         m.estimated_delivery,
         m.warranty_end,
         c.name AS customer_name,
@@ -124,13 +126,21 @@ class _WhatsappScreenState extends State<WhatsappScreen> {
       'tracking_url': trackingUrl,
     };
 
-    var message = _stripUnsupportedTrackingLinks(
-      template?.buildMessage(variables) ??
-          'السلام عليكم $customerName،\nحالة جهازك ${variables['device']}: ${variables['status']}.\nرقم الصيانة: ${variables['ticket_number']}',
-    );
+    var message = status == AppConstants.statusNew
+        ? WhatsappRepository.buildReceivedCustomerMessage(
+            customerName: customerName,
+            trackingUrl: trackingUrl,
+            receivedDate: _formatOptionalDate(row['received_at'] as int?),
+            device: variables['device']!,
+            problem: row['fault_description'] as String? ?? '',
+          )
+        : _stripUnsupportedTrackingLinks(
+            template?.buildMessage(variables) ??
+                'السلام عليكم $customerName،\nحالة جهازك ${variables['device']}: ${variables['status']}.\nرقم الصيانة: ${variables['ticket_number']}',
+          );
     if (_shouldAppendTrackingUrl(status, message, trackingUrl)) {
       message = [
-        'رابط تتبع حالة الجهاز مباشرة بدون إدخال:',
+        'رابط تتبع الجهاز:',
         trackingUrl,
         '',
         'رقم الطلب: $ticketNumber',
@@ -206,6 +216,7 @@ class _WhatsappScreenState extends State<WhatsappScreen> {
     final lower = value.toLowerCase();
     final legacyHost = ['war', 'shati', 'app.com'].join();
     return lower.contains(legacyHost) ||
+        lower.contains('proshop.example.com') ||
         lower.contains('proshop://') ||
         lower.contains('proshop.local');
   }

@@ -111,6 +111,7 @@ ORDER BY
 
     final warranties = await _warrantyRepo.getAll();
     final visibleWarranties = warranties.where((warranty) {
+      if (warranty.isArchived) return false;
       if (query.isEmpty) return true;
       final haystack = [
         warranty.customerName,
@@ -216,6 +217,9 @@ ORDER BY
       createdBy: userId,
       notes: notes,
       internalNotes: internalNotes,
+      estimatedDelivery: DateTime.now()
+          .add(Duration(days: data.expectedRepairDays))
+          .millisecondsSinceEpoch,
     ).copyWith(status: AppConstants.statusNew);
 
     final id = await _maintenanceRepo.create(maintenance);
@@ -753,6 +757,7 @@ class RepairIntakeData {
   final bool waterDamage;
   final String extraNotes;
   final List<String> imagePaths;
+  final int expectedRepairDays;
 
   const RepairIntakeData({
     this.customerId,
@@ -777,6 +782,7 @@ class RepairIntakeData {
     required this.waterDamage,
     required this.extraNotes,
     required this.imagePaths,
+    required this.expectedRepairDays,
   });
 
   String get brandOrType {

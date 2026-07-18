@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/alert_sound_service.dart';
 import '../../../../core/services/settings_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -56,6 +57,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _photoMaxSizeCtrl = TextEditingController();
   final _photoQualityCtrl = TextEditingController();
   final _photoImagesPerPageCtrl = TextEditingController();
+  final _deviceStaySoundCtrl = TextEditingController();
+  final _warrantySoundCtrl = TextEditingController();
   List<String> _deviceReceivers = [];
   bool _autoBackup = false;
   bool _autoWhatsappSend = false;
@@ -67,6 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _photoWatermarkReports = false;
   bool _photoShowEmployee = true;
   bool _photoShowDateTime = true;
+  bool _alertSoundsEnabled = true;
   bool _loading = true;
   bool _saving = false;
 
@@ -114,6 +118,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _photoMaxSizeCtrl.dispose();
     _photoQualityCtrl.dispose();
     _photoImagesPerPageCtrl.dispose();
+    _deviceStaySoundCtrl.dispose();
+    _warrantySoundCtrl.dispose();
     super.dispose();
   }
 
@@ -158,8 +164,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _photoQualityCtrl.text = _service.photoQuality.toString();
       _photoImagesPerPageCtrl.text =
           _service.photoReportImagesPerPage.toString();
+      _deviceStaySoundCtrl.text = _service.deviceStayAlertSoundPath;
+      _warrantySoundCtrl.text = _service.warrantyAlertSoundPath;
       _autoBackup = _service.autoBackup;
       _autoWhatsappSend = _service.autoWhatsappSend;
+      _alertSoundsEnabled = _service.alertSoundsEnabled;
       _invoiceResetYearly = _service.invoiceResetYearly;
       _invoiceIncludeIntakePhotos = _service.invoiceIncludeIntakePhotos;
       _invoiceShowSignature = _service.invoiceShowSignature;
@@ -233,6 +242,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               : _photoImagesPerPageCtrl.text.trim(),
       'photo_show_employee': _photoShowEmployee ? 'true' : 'false',
       'photo_show_datetime': _photoShowDateTime ? 'true' : 'false',
+      'alert_sounds_enabled': _alertSoundsEnabled ? 'true' : 'false',
+      'device_stay_alert_sound_path': _deviceStaySoundCtrl.text.trim(),
+      'warranty_alert_sound_path': _warrantySoundCtrl.text.trim(),
       'auto_backup': _autoBackup ? 'true' : 'false',
       'auto_backup_interval':
           AppConstants.automaticBackupIntervalDays.toString(),
@@ -304,6 +316,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final path = result?.files.single.path;
     if (path == null) return;
     setState(() => controller.text = path);
+  }
+
+  Future<void> _pickSoundPath(TextEditingController controller) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['mp3', 'wav', 'm4a', 'aac', 'ogg'],
+    );
+    final path = result?.files.single.path;
+    if (path == null) return;
+    setState(() => controller.text = path);
+  }
+
+  Future<void> _testAlertSound(
+    AlertSoundKind kind,
+    TextEditingController controller,
+  ) async {
+    await AlertSoundService().play(
+      kind,
+      force: true,
+      customPathOverride: controller.text,
+    );
   }
 
   @override
@@ -475,6 +508,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           _buildDeviceReceiverSettings(),
           const SizedBox(height: 12),
+          _buildAlertSoundSettings(),
+          const SizedBox(height: 12),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('النسخ الاحتياطي التلقائي'),
@@ -495,6 +530,148 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _autoWhatsappSend,
             activeColor: AppColors.success,
             onChanged: (value) => setState(() => _autoWhatsappSend = value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertSoundSettings() {
+    final colors = context.appColors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.volume_up_rounded, color: AppColors.warning),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'أصوات التنبيهات',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              Switch(
+                value: _alertSoundsEnabled,
+                activeColor: AppColors.warning,
+                onChanged: (value) =>
+                    setState(() => _alertSoundsEnabled = value),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'اترك المسار فارغاً لاستخدام الصوت الافتراضي المرفق مع التطبيق، أو اختر ملف نغمة من جهازك.',
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSoundPicker(
+            label: 'صوت بقاء الجوال في المحل يومين',
+            controller: _deviceStaySoundCtrl,
+            kind: AlertSoundKind.deviceStay,
+          ),
+          const SizedBox(height: 10),
+          _buildSoundPicker(
+            label: 'صوت ضمان ينتهي غداً أو بعد غد',
+            controller: _warrantySoundCtrl,
+            kind: AlertSoundKind.warrantyExpiring,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSoundPicker({
+    required String label,
+    required TextEditingController controller,
+    required AlertSoundKind kind,
+  }) {
+    final path = controller.text.trim();
+    final hasFile = path.isNotEmpty && File(path).existsSync();
+    final subtitle = path.isEmpty
+        ? 'الصوت الافتراضي داخل التطبيق'
+        : hasFile
+            ? path
+            : 'الملف غير موجود، سيستخدم التطبيق الصوت الافتراضي';
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          AppFormField(
+            label: 'مسار ملف الصوت',
+            controller: controller,
+            prefix: Icon(
+              hasFile || path.isEmpty
+                  ? Icons.music_note_rounded
+                  : Icons.warning_amber_rounded,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: hasFile || path.isEmpty
+                  ? context.appColors.textSecondary
+                  : AppColors.warning,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _pickSoundPath(controller),
+                icon: const Icon(Icons.audio_file_rounded),
+                label: const Text('اختيار صوت'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _testAlertSound(kind, controller),
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('تجربة'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => setState(() => controller.clear()),
+                icon: const Icon(Icons.restart_alt_rounded),
+                label: const Text('الافتراضي'),
+              ),
+            ],
           ),
         ],
       ),

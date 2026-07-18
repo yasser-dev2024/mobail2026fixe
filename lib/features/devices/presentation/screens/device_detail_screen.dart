@@ -53,9 +53,13 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       final shopId = await _db.getCurrentShopId();
       // Load maintenance records
       final rows = await _db.rawQuery(
-        '''SELECT m.*, c.name as customer_name
+        '''SELECT m.*, c.name as customer_name,
+                  w.expiry_approved AS warranty_expiry_approved,
+                  w.expiry_approved_at AS warranty_expiry_approved_at,
+                  w.expiry_approved_by AS warranty_expiry_approved_by
            FROM maintenance m
            LEFT JOIN customers c ON c.id = m.customer_id AND c.shop_id = m.shop_id
+           LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id
            WHERE m.shop_id = ? AND m.device_id = ? AND m.deleted_at IS NULL
            ORDER BY m.created_at ASC''',
         [shopId, widget.deviceId],
@@ -1225,6 +1229,10 @@ class _MaintenanceTimeline extends StatelessWidget {
                                 ],
                               ],
                             ),
+                            if (m.warrantyExpiryApproved) ...[
+                              const SizedBox(height: 5),
+                              _WarrantyExpiredMiniStamp(maintenance: m),
+                            ],
                           ],
                         ),
                       ),
@@ -1236,6 +1244,40 @@ class _MaintenanceTimeline extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _WarrantyExpiredMiniStamp extends StatelessWidget {
+  final MaintenanceModel maintenance;
+  const _WarrantyExpiredMiniStamp({required this.maintenance});
+
+  @override
+  Widget build(BuildContext context) {
+    String fmt(int? ms) {
+      if (ms == null) return 'غير محدد';
+      final date = DateTime.fromMillisecondsSinceEpoch(ms);
+      return '${date.day}/${date.month}/${date.year}';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        'انتهى الضمان - النهاية: ${fmt(maintenance.warrantyEnd)} - الاعتماد: ${fmt(maintenance.warrantyExpiryApprovedAt)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.cairo(
+          color: AppColors.error,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }

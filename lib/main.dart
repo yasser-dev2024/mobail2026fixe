@@ -39,7 +39,7 @@ class ProShopApp extends StatelessWidget {
       providers: [
         BlocProvider<ThemeCubit>.value(value: themeCubit),
         BlocProvider<NotificationsCubit>(
-          create: (_) => NotificationsCubit()..loadNotifications(),
+          create: (_) => NotificationsCubit()..generateSmartNotifications(),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(

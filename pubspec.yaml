@@ -66,6 +66,7 @@ dependencies:
 
   # Drag & Drop for Desktop
   desktop_drop: ^0.4.4
+  audioplayers: ^6.6.0
 
 dev_dependencies:
   flutter_test:
@@ -78,3 +79,4 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/sounds/

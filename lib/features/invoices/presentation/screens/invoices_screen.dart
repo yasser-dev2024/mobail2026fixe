@@ -292,6 +292,7 @@ class _InvoiceCard extends StatelessWidget {
     final warrantyColor = switch (invoice.warrantyStatus) {
       'active' => AppColors.success,
       'expired' => AppColors.error,
+      'expired_approved' => AppColors.error,
       'pending' => AppColors.warning,
       _ => colors.textSecondary,
     };
@@ -433,6 +434,8 @@ class _InvoiceCard extends StatelessWidget {
         return 'ضمان ساري';
       case 'expired':
         return 'ضمان منتهي';
+      case 'expired_approved':
+        return 'انتهى الضمان';
       case 'pending':
         return 'ضمان لم يبدأ';
       default:

@@ -6,6 +6,7 @@ void main() {
     required int days,
     required int warrantyDays,
     bool isVoid = false,
+    bool expiryApproved = false,
   }) {
     final today = DateTime.now();
     final start = DateTime(today.year, today.month, today.day);
@@ -21,6 +22,7 @@ void main() {
       startDate: start.millisecondsSinceEpoch,
       endDate: end.millisecondsSinceEpoch,
       isVoid: isVoid,
+      expiryApproved: expiryApproved,
       createdAt: start.millisecondsSinceEpoch,
       updatedAt: start.millisecondsSinceEpoch,
     );
@@ -37,5 +39,19 @@ void main() {
   test('long warranty is more than 90 days', () {
     expect(warrantyWith(days: 120, warrantyDays: 91).isLongWarranty, isTrue);
     expect(warrantyWith(days: 90, warrantyDays: 90).isLongWarranty, isFalse);
+  });
+
+  test('expired, void, and approved warranties are archived', () {
+    expect(warrantyWith(days: -1, warrantyDays: 30).isArchived, isTrue);
+    expect(
+      warrantyWith(days: 10, warrantyDays: 30, isVoid: true).isArchived,
+      isTrue,
+    );
+    expect(
+      warrantyWith(days: 10, warrantyDays: 30, expiryApproved: true).isArchived,
+      isTrue,
+    );
+    expect(warrantyWith(days: 0, warrantyDays: 30).isArchived, isFalse);
+    expect(warrantyWith(days: 10, warrantyDays: 30).isArchived, isFalse);
   });
 }

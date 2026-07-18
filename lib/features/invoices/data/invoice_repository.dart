@@ -54,6 +54,8 @@ class InvoiceRepository {
     final centerSnapshot = _settingsSnapshot(settings);
     final warrantyType = data['warranty_type']?.toString();
     final warrantyEnd = PdfArabicUtils.integer(data['warranty_end']);
+    final warrantyExpiryApproved =
+        (PdfArabicUtils.integer(data['warranty_expiry_approved']) ?? 0) == 1;
 
     final invoice = InvoiceModel.create(
       shopId: settings.shopId,
@@ -86,10 +88,12 @@ class InvoiceRepository {
     final approved = invoice.copyWith(
       status: AppConstants.invoiceApproved,
       approvedAt: DateTime.now().millisecondsSinceEpoch,
-      warrantyStatus: InvoiceModel.calculateWarrantyStatus(
-        warrantyType: warrantyType,
-        warrantyEnd: warrantyEnd,
-      ),
+      warrantyStatus: warrantyExpiryApproved
+          ? 'expired_approved'
+          : InvoiceModel.calculateWarrantyStatus(
+              warrantyType: warrantyType,
+              warrantyEnd: warrantyEnd,
+            ),
     );
 
     await _db.insert('invoices', approved.toMap());
@@ -333,18 +337,24 @@ class InvoiceRepository {
     final shopId = await _db.getCurrentShopId();
     final rows = await _db.rawQuery(
       '''
-SELECT id, warranty_type, warranty_end, warranty_status
-FROM invoices
-WHERE shop_id = ? AND status != ?
+SELECT i.id, i.warranty_type, i.warranty_end, i.warranty_status,
+       w.expiry_approved AS warranty_expiry_approved
+FROM invoices i
+LEFT JOIN warranties w ON w.maintenance_id = i.maintenance_id AND w.shop_id = i.shop_id
+WHERE i.shop_id = ? AND i.status != ?
 ''',
       [shopId, AppConstants.invoiceCancelled],
     );
     final now = DateTime.now().millisecondsSinceEpoch;
     for (final row in rows) {
-      final status = InvoiceModel.calculateWarrantyStatus(
-        warrantyType: row['warranty_type'] as String?,
-        warrantyEnd: PdfArabicUtils.integer(row['warranty_end']),
-      );
+      final approved =
+          (PdfArabicUtils.integer(row['warranty_expiry_approved']) ?? 0) == 1;
+      final status = approved
+          ? 'expired_approved'
+          : InvoiceModel.calculateWarrantyStatus(
+              warrantyType: row['warranty_type'] as String?,
+              warrantyEnd: PdfArabicUtils.integer(row['warranty_end']),
+            );
       if (status != row['warranty_status']) {
         await _db.rawUpdate(
           'UPDATE invoices SET warranty_status = ?, updated_at = ? WHERE shop_id = ? AND id = ?',
@@ -398,11 +408,15 @@ SELECT m.*,
        c.created_at AS customer_created_at,
        d.serial_number AS serial_number,
        d.storage AS storage,
-       u.name AS technician_name
+       u.name AS technician_name,
+       w.expiry_approved AS warranty_expiry_approved,
+       w.expiry_approved_at AS warranty_expiry_approved_at,
+       w.expiry_approved_by AS warranty_expiry_approved_by
 FROM maintenance m
 LEFT JOIN customers c ON c.id = m.customer_id AND c.shop_id = m.shop_id
 LEFT JOIN devices d ON d.id = m.device_id AND d.shop_id = m.shop_id
 LEFT JOIN users u ON u.id = m.technician_id
+LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id
 WHERE m.shop_id = ?
   AND m.id = ?
   AND m.deleted_at IS NULL

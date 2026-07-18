@@ -81,7 +81,9 @@ class NotificationService {
          WHERE w.is_void = 0
            AND w.shop_id = ?
            AND w.end_date > ?
-           AND w.end_date <= ?''',
+           AND w.end_date <= ?
+           AND COALESCE(w.alert_disabled, 0) = 0
+           AND COALESCE(w.expiry_approved, 0) = 0''',
       [shopId, nowMs, sevenDaysLater],
     );
 

@@ -198,11 +198,15 @@ SELECT m.*,
        c.name AS customer_name,
        c.phone AS customer_phone,
        d.serial_number AS serial_number,
-       u.name AS technician_name
+       u.name AS technician_name,
+       w.expiry_approved AS warranty_expiry_approved,
+       w.expiry_approved_at AS warranty_expiry_approved_at,
+       w.expiry_approved_by AS warranty_expiry_approved_by
 FROM maintenance m
 LEFT JOIN customers c ON c.id = m.customer_id AND c.shop_id = m.shop_id
 LEFT JOIN devices d ON d.id = m.device_id AND d.shop_id = m.shop_id
 LEFT JOIN users u ON u.id = m.technician_id
+LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id
 WHERE m.shop_id = ?
   AND m.id = ?
   AND m.deleted_at IS NULL

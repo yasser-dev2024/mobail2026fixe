@@ -1,6 +1,7 @@
 import '../../../core/constants/app_constants.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/services/settings_service.dart';
+import '../services/remote_tracking_service.dart';
 
 class TrackingService {
   TrackingService();
@@ -13,7 +14,30 @@ class TrackingService {
     final base = settings.trackingBaseUrl.trim();
     if (base.isEmpty || ticketNumber.trim().isEmpty) return '';
 
-    final encodedTicket = Uri.encodeComponent(ticketNumber.trim());
+    final url = buildUrlFromBase(base, ticketNumber);
+    final record = await loadByCode(ticketNumber);
+    if (record == null) return url;
+
+    final remoteEndpoint =
+        await RemoteTrackingService().syncTicket(ticketNumber);
+
+    final uri = Uri.parse(url);
+    return uri.replace(queryParameters: {
+      ...uri.queryParameters,
+      if (remoteEndpoint != null) 'source': remoteEndpoint,
+      'status': AppConstants.maintenanceStatusLabel(record.status),
+      'device': record.deviceName,
+      'problem': record.faultDescription,
+      'received': _formatTrackingDate(record.receivedAt),
+    }).toString();
+  }
+
+  static String buildUrlFromBase(String baseUrl, String ticketNumber) {
+    final base = baseUrl.trim();
+    final ticket = ticketNumber.trim();
+    if (base.isEmpty || ticket.isEmpty) return '';
+
+    final encodedTicket = Uri.encodeComponent(ticket);
     if (base.contains('{ticket}')) {
       return base.replaceAll('{ticket}', encodedTicket);
     }
@@ -21,6 +45,12 @@ class TrackingService {
     final normalized =
         base.endsWith('/') ? base.substring(0, base.length - 1) : base;
     return '$normalized/$encodedTicket';
+  }
+
+  String _formatTrackingDate(int? milliseconds) {
+    if (milliseconds == null) return '';
+    final date = DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
   }
 
   Future<TrackingRecord?> loadByCode(String code) async {

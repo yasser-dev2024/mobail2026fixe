@@ -195,10 +195,17 @@ class _WarrantyScreenState extends State<WarrantyScreen>
           ),
         );
       }
-      return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      return GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 230,
+          mainAxisExtent: 230,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
         itemCount: items.length,
-        itemBuilder: (context, index) => _WarrantyCard(warranty: items[index]),
+        itemBuilder: (context, index) =>
+            _WarrantyCircle(warranty: items[index]),
       );
     }
     return const SizedBox.shrink();
@@ -220,6 +227,86 @@ class _WarrantyScreenState extends State<WarrantyScreen>
 }
 
 enum _DurationFilter { all, short, long }
+
+class _WarrantyCircle extends StatelessWidget {
+  final WarrantyModel warranty;
+
+  const _WarrantyCircle({required this.warranty});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (warranty.status) {
+      'active' => AppColors.warrantyActive,
+      'expiring' => AppColors.warrantyExpiringSoon,
+      _ => AppColors.warrantyExpired,
+    };
+    final colors = context.appColors;
+    return Semantics(
+      button: true,
+      label:
+          '${warranty.customerName}, ${warranty.deviceInfo}, ${warranty.customerPhone}',
+      child: Material(
+        color: colors.card,
+        shape: CircleBorder(
+          side: BorderSide(color: color.withValues(alpha: 0.75), width: 3),
+        ),
+        elevation: 4,
+        shadowColor: color.withValues(alpha: 0.28),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => context.go('/maintenance/${warranty.maintenanceId}'),
+          child: Padding(
+            padding: const EdgeInsets.all(25),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.verified_user_rounded, color: color, size: 28),
+                const SizedBox(height: 8),
+                Text(
+                  warranty.customerName ?? 'عميل غير محدد',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  warranty.deviceInfo,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  warranty.customerPhone?.trim().isNotEmpty == true
+                      ? warranty.customerPhone!
+                      : 'بدون رقم جوال',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textDirection: TextDirection.ltr,
+                  style: GoogleFonts.cairo(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stat card
@@ -279,6 +366,9 @@ class _StatCard extends StatelessWidget {
 // Warranty card
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Kept temporarily for backwards-compatible visual reference while the new
+// tablet-friendly circular grid is rolled out.
+// ignore: unused_element
 class _WarrantyCard extends StatelessWidget {
   final WarrantyModel warranty;
   const _WarrantyCard({required this.warranty});
@@ -366,6 +456,30 @@ class _WarrantyCard extends StatelessWidget {
                     fontSize: 13, color: colors.textSecondary),
               ),
               const SizedBox(height: 10),
+              if (warranty.expiryApproved) ...[
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.45)),
+                  ),
+                  child: Text(
+                    'انتهى الضمان - تاريخ الانتهاء: ${_dualDate(endDate)} - تاريخ الاعتماد: ${warranty.expiryApprovedAt == null ? 'غير محدد' : _dualDate(DateTime.fromMillisecondsSinceEpoch(warranty.expiryApprovedAt!))}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(
+                      color: AppColors.error,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               Wrap(
                 spacing: 8,
                 runSpacing: 8,

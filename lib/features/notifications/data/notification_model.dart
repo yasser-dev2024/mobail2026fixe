@@ -75,12 +75,17 @@ class NotificationModel {
     if (type.startsWith('maintenance_status_')) {
       return Icons.campaign_rounded;
     }
+    if (type.startsWith('warranty_')) {
+      return Icons.verified_user_rounded;
+    }
     if (type == 'device_manual') {
       return Icons.phone_in_talk_rounded;
     }
     switch (type) {
       case 'maintenance_ready':
         return Icons.check_circle_rounded;
+      case 'device_stay_two_days':
+        return Icons.timer_rounded;
       case 'warranty_expiring':
         return Icons.verified_user_rounded;
       case 'low_stock':

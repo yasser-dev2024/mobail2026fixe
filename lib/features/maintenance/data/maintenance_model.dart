@@ -38,6 +38,9 @@ class MaintenanceModel {
   final String? customerPhone;
   final String? technicianName;
   final String? createdByName;
+  final bool warrantyExpiryApproved;
+  final int? warrantyExpiryApprovedAt;
+  final String? warrantyExpiryApprovedBy;
 
   const MaintenanceModel({
     required this.id,
@@ -72,6 +75,9 @@ class MaintenanceModel {
     this.customerPhone,
     this.technicianName,
     this.createdByName,
+    this.warrantyExpiryApproved = false,
+    this.warrantyExpiryApprovedAt,
+    this.warrantyExpiryApprovedBy,
   });
 
   factory MaintenanceModel.create({
@@ -131,6 +137,9 @@ class MaintenanceModel {
       customerPhone: null,
       technicianName: null,
       createdByName: null,
+      warrantyExpiryApproved: false,
+      warrantyExpiryApprovedAt: null,
+      warrantyExpiryApprovedBy: null,
     );
   }
 
@@ -168,6 +177,10 @@ class MaintenanceModel {
       customerPhone: map['customer_phone'] as String?,
       technicianName: map['technician_name'] as String?,
       createdByName: map['created_by_name'] as String?,
+      warrantyExpiryApproved:
+          (map['warranty_expiry_approved'] as int? ?? 0) == 1,
+      warrantyExpiryApprovedAt: map['warranty_expiry_approved_at'] as int?,
+      warrantyExpiryApprovedBy: map['warranty_expiry_approved_by'] as String?,
     );
   }
 
@@ -237,6 +250,9 @@ class MaintenanceModel {
     Object? customerPhone = _sentinel,
     Object? technicianName = _sentinel,
     Object? createdByName = _sentinel,
+    bool? warrantyExpiryApproved,
+    Object? warrantyExpiryApprovedAt = _sentinel,
+    Object? warrantyExpiryApprovedBy = _sentinel,
   }) {
     return MaintenanceModel(
       id: id ?? this.id,
@@ -292,6 +308,14 @@ class MaintenanceModel {
       createdByName: createdByName == _sentinel
           ? this.createdByName
           : createdByName as String?,
+      warrantyExpiryApproved:
+          warrantyExpiryApproved ?? this.warrantyExpiryApproved,
+      warrantyExpiryApprovedAt: warrantyExpiryApprovedAt == _sentinel
+          ? this.warrantyExpiryApprovedAt
+          : warrantyExpiryApprovedAt as int?,
+      warrantyExpiryApprovedBy: warrantyExpiryApprovedBy == _sentinel
+          ? this.warrantyExpiryApprovedBy
+          : warrantyExpiryApprovedBy as String?,
     );
   }
 

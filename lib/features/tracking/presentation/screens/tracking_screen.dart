@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -73,6 +74,23 @@ class _TrackingScreenState extends State<TrackingScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
               children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: () => context.go('/dashboard'),
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: const Text('العودة إلى إدارة الصيانة'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF132238),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 const _TrackingHero(),
                 if (_loading) ...[
                   const SizedBox(height: 28),

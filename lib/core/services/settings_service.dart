@@ -7,7 +7,8 @@ class SettingsService {
   SettingsService._internal();
 
   static const defaultShopName = 'محل جوالات ProShop';
-  static const defaultTrackingBaseUrl = 'https://proshop.example.com/track';
+  static const defaultTrackingBaseUrl =
+      'https://yasser-dev2024.github.io/mobail2026fixe/track/?ticket={ticket}';
 
   final DatabaseService _db = DatabaseService();
 
@@ -83,6 +84,11 @@ class SettingsService {
   bool get invoiceShowSignature => _cache['invoice_show_signature'] != 'false';
   bool get autoBackup => _cache['auto_backup'] == 'true';
   bool get autoWhatsappSend => _cache['auto_whatsapp_send'] == 'true';
+  bool get alertSoundsEnabled => _cache['alert_sounds_enabled'] != 'false';
+  String get deviceStayAlertSoundPath =>
+      _cache['device_stay_alert_sound_path'] ?? '';
+  String get warrantyAlertSoundPath =>
+      _cache['warranty_alert_sound_path'] ?? '';
   bool get shopSetupCompleted => _cache['shop_setup_completed'] == 'true';
   int get autoBackupInterval {
     final days = int.tryParse(_cache['auto_backup_interval'] ?? '') ??
@@ -188,7 +194,8 @@ class SettingsService {
   bool _isUnsupportedTrackingUrl(String value) {
     final lower = value.toLowerCase();
     return _isLegacyExternalUrl(lower) ||
-        lower.contains('proshop://') ||
+        lower.contains('proshop.example.com') ||
+        lower.startsWith('proshop://') ||
         lower.contains('proshop.local');
   }
 }
