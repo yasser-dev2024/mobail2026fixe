@@ -11,9 +11,13 @@
 <body><main class="wrap">
   <section class="hero"><div class="logo">✓</div><div><h1>تتبع صيانة جهازك</h1><p>صفحة العميل المستقلة</p></div></section>
   <section class="status"><small>الحالة الحالية</small><h2 id="status">تم استلام الجهاز</h2><p>رقم الطلب: <b id="ticket">—</b></p></section>
-  <section class="card"><h3>بيانات الجهاز</h3><div class="row"><span>نوع الجوال</span><b id="device">غير محدد</b></div><div class="row"><span>المشكلة</span><b id="problem">غير محددة</b></div><div class="row"><span>تاريخ الاستلام</span><b id="received">غير محدد</b></div></section>
+  <section class="card"><h3>بيانات الجهاز</h3><div class="row"><span>نوع الجوال</span><b id="device">غير محدد</b></div><div class="row"><span>المشكلة</span><b id="problem">غير محددة</b></div><div class="row"><span>تاريخ الاستلام</span><b id="received">غير محدد</b></div><div class="row"><span>آخر تحديث</span><b id="updated">—</b></div></section>
   <footer>شكراً لثقتكم بنا، نسعد بخدمتكم دائماً.</footer>
 </main><script>
-const p=new URLSearchParams(location.search);for(const k of ['ticket','status','device','problem','received']){const v=p.get(k);if(v)document.getElementById(k).textContent=v}
+const p=new URLSearchParams(location.search),fields=['ticket','status','device','problem','received','updated'];
+function show(data){for(const k of fields){const v=data[k];if(v)document.getElementById(k).textContent=v}}
+show(Object.fromEntries(p));
+async function refresh(){const source=p.get('source');if(!source)return;try{const response=await fetch(source,{cache:'no-store'});if(response.ok)show(await response.json())}catch(_){}}
+refresh();setInterval(refresh,20000);
   </script></body>
 </html>
