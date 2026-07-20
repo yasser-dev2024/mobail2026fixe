@@ -69,6 +69,7 @@ class _MaintenanceFormScreenState extends State<MaintenanceFormScreen> {
   String _selectedStatus = AppConstants.statusNew;
   String? _selectedWarrantyType;
   DateTime? _estimatedDelivery;
+  int _expectedRepairDays = 2;
 
   final List<MaintenancePartModel> _parts = [];
   final List<_PendingIntakePhoto> _intakePhotos = [];
@@ -199,6 +200,9 @@ class _MaintenanceFormScreenState extends State<MaintenanceFormScreen> {
       if (m.estimatedDelivery != null) {
         _estimatedDelivery =
             DateTime.fromMillisecondsSinceEpoch(m.estimatedDelivery!);
+        final received = DateTime.fromMillisecondsSinceEpoch(m.receivedAt);
+        _expectedRepairDays =
+            _estimatedDelivery!.difference(received).inDays.clamp(1, 30);
       }
       if (m.technicianId != null) {
         _selectedTechnician =
@@ -274,7 +278,9 @@ class _MaintenanceFormScreenState extends State<MaintenanceFormScreen> {
           warrantyDays: _selectedWarrantyType == AppConstants.warrantyCustom
               ? warrantyDays
               : null,
-          estimatedDelivery: _estimatedDelivery?.millisecondsSinceEpoch,
+          estimatedDelivery: (_estimatedDelivery ??
+                  DateTime.now().add(Duration(days: _expectedRepairDays)))
+              .millisecondsSinceEpoch,
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           internalNotes: _internalNotesCtrl.text.trim().isEmpty
               ? null
@@ -317,7 +323,9 @@ class _MaintenanceFormScreenState extends State<MaintenanceFormScreen> {
           warrantyDays: _selectedWarrantyType == AppConstants.warrantyCustom
               ? warrantyDays
               : null,
-          estimatedDelivery: _estimatedDelivery?.millisecondsSinceEpoch,
+          estimatedDelivery: (_estimatedDelivery ??
+                  DateTime.now().add(Duration(days: _expectedRepairDays)))
+              .millisecondsSinceEpoch,
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           internalNotes: _internalNotesCtrl.text.trim().isEmpty
               ? null
@@ -896,45 +904,81 @@ class _MaintenanceFormScreenState extends State<MaintenanceFormScreen> {
 
                     const SizedBox(height: 10),
 
-                    // Estimated delivery date
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _estimatedDelivery ??
-                              DateTime.now().add(const Duration(days: 3)),
-                          firstDate: DateTime.now(),
-                          lastDate:
-                              DateTime.now().add(const Duration(days: 365)),
-                        );
-                        if (picked != null) {
-                          setState(() => _estimatedDelivery = picked);
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'الموعد المتوقع للتسليم',
-                          labelStyle: GoogleFonts.cairo(),
-                          prefixIcon: const Icon(Icons.calendar_today_rounded),
-                          suffixIcon: _estimatedDelivery != null
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded),
-                                  onPressed: () =>
-                                      setState(() => _estimatedDelivery = null),
-                                )
-                              : null,
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.55),
+                          width: 1.5,
                         ),
-                        child: Text(
-                          _estimatedDelivery != null
-                              ? '${_estimatedDelivery!.day}/${_estimatedDelivery!.month}/${_estimatedDelivery!.year}'
-                              : 'اختر تاريخ',
-                          style: GoogleFonts.cairo(
-                            fontSize: 14,
-                            color: _estimatedDelivery != null
-                                ? context.appColors.textPrimary
-                                : context.appColors.textSecondary,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'مدة الصيانة المتوقعة (أساس التنبيه)',
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.w800,
+                              color: context.appColors.textPrimary,
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'يتكرر التنبيه يومياً بعد تجاوز المدة حتى إغلاق طلب الصيانة.',
+                            style: GoogleFonts.cairo(
+                              fontSize: 12,
+                              color: context.appColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<int>(
+                            value: _expectedRepairDays,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: 'المدة المتوقعة',
+                              prefixIcon: const Icon(Icons.timer_outlined),
+                              suffixText: 'يوم',
+                              labelStyle: GoogleFonts.cairo(),
+                            ),
+                            items: List.generate(30, (index) => index + 1)
+                                .map((days) => DropdownMenuItem(
+                                      value: days,
+                                      child: Text(
+                                        days == 1 ? 'يوم واحد' : '$days أيام',
+                                        style: GoogleFonts.cairo(),
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (days) {
+                              if (days == null) return;
+                              setState(() {
+                                _expectedRepairDays = days;
+                                final base = _existing == null
+                                    ? DateTime.now()
+                                    : DateTime.fromMillisecondsSinceEpoch(
+                                        _existing!.receivedAt);
+                                _estimatedDelivery =
+                                    base.add(Duration(days: days));
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Builder(builder: (context) {
+                            final date = _estimatedDelivery ??
+                                DateTime.now().add(
+                                  Duration(days: _expectedRepairDays),
+                                );
+                            return Text(
+                              'موعد التنبيه: ${date.day}/${date.month}/${date.year}',
+                              style: GoogleFonts.cairo(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.warning,
+                              ),
+                            );
+                          }),
+                        ],
                       ),
                     ),
                   ],

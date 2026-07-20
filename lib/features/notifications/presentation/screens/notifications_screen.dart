@@ -325,10 +325,12 @@ class _NotificationCardState extends State<_NotificationCard>
   @override
   void initState() {
     super.initState();
-    _pulseController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 1))
-          ..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.5, end: 1.0).animate(_pulseController);
+    _pulseController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 520))
+      ..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.12, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -411,11 +413,18 @@ class _NotificationCardState extends State<_NotificationCard>
                             builder: (_, __) => Opacity(
                               opacity: _pulseAnim.value,
                               child: Container(
-                                width: 12,
-                                height: 12,
+                                width: 18,
+                                height: 18,
                                 decoration: BoxDecoration(
                                   color: AppColors.error,
                                   shape: BoxShape.circle,
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: AppColors.error,
+                                      blurRadius: 12,
+                                      spreadRadius: 3,
+                                    ),
+                                  ],
                                   border: Border.all(
                                       color: Colors.white, width: 1.5),
                                 ),

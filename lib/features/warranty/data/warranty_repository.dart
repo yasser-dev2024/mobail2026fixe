@@ -63,7 +63,7 @@ class WarrantyRepository {
     final whereClause = 'AND ${conditions.join(' AND ')}';
 
     final rows = await _db.rawQuery('''
-SELECT w.*, c.name AS customer_name, m.ticket_number
+SELECT w.*, c.name AS customer_name, c.phone AS customer_phone, m.ticket_number
 FROM warranties w
 LEFT JOIN customers c ON w.customer_id = c.id AND c.shop_id = w.shop_id
 LEFT JOIN maintenance m ON w.maintenance_id = m.id AND m.shop_id = w.shop_id
@@ -85,7 +85,7 @@ ORDER BY w.end_date ASC
   Future<WarrantyModel?> getById(String id) async {
     final shopId = await _db.getCurrentShopId();
     final rows = await _db.rawQuery('''
-SELECT w.*, c.name AS customer_name, m.ticket_number
+SELECT w.*, c.name AS customer_name, c.phone AS customer_phone, m.ticket_number
 FROM warranties w
 LEFT JOIN customers c ON w.customer_id = c.id AND c.shop_id = w.shop_id
 LEFT JOIN maintenance m ON w.maintenance_id = m.id AND m.shop_id = w.shop_id
@@ -99,7 +99,7 @@ LIMIT 1
   Future<WarrantyModel?> getByMaintenance(String maintenanceId) async {
     final shopId = await _db.getCurrentShopId();
     final rows = await _db.rawQuery('''
-SELECT w.*, c.name AS customer_name, m.ticket_number
+SELECT w.*, c.name AS customer_name, c.phone AS customer_phone, m.ticket_number
 FROM warranties w
 LEFT JOIN customers c ON w.customer_id = c.id AND c.shop_id = w.shop_id
 LEFT JOIN maintenance m ON w.maintenance_id = m.id AND m.shop_id = w.shop_id

@@ -25,6 +25,7 @@ class WarrantyModel {
 
   // Join fields (not stored in DB directly)
   final String? customerName;
+  final String? customerPhone;
   final String? ticketNumber;
 
   const WarrantyModel({
@@ -48,6 +49,7 @@ class WarrantyModel {
     required this.createdAt,
     required this.updatedAt,
     this.customerName,
+    this.customerPhone,
     this.ticketNumber,
   });
 
@@ -78,6 +80,7 @@ class WarrantyModel {
       createdAt: now,
       updatedAt: now,
       customerName: null,
+      customerPhone: null,
       ticketNumber: null,
     );
   }
@@ -104,6 +107,7 @@ class WarrantyModel {
       createdAt: map['created_at'] as int,
       updatedAt: map['updated_at'] as int,
       customerName: map['customer_name'] as String?,
+      customerPhone: map['customer_phone'] as String?,
       ticketNumber: map['ticket_number'] as String?,
     );
   }
@@ -153,6 +157,7 @@ class WarrantyModel {
     int? createdAt,
     int? updatedAt,
     Object? customerName = _sentinel,
+    Object? customerPhone = _sentinel,
     Object? ticketNumber = _sentinel,
   }) {
     return WarrantyModel(
@@ -188,6 +193,9 @@ class WarrantyModel {
       customerName: customerName == _sentinel
           ? this.customerName
           : customerName as String?,
+      customerPhone: customerPhone == _sentinel
+          ? this.customerPhone
+          : customerPhone as String?,
       ticketNumber: ticketNumber == _sentinel
           ? this.ticketNumber
           : ticketNumber as String?,
@@ -220,6 +228,10 @@ class WarrantyModel {
       warrantyDays > AppConstants.longWarrantyThresholdDays;
 
   bool get hasExpiredStamp => expiryApproved;
+
+  /// Archived warranties remain in the full warranty register, but should not
+  /// consume space in the repair-board home screen.
+  bool get isArchived => isVoid || expiryApproved || calendarDaysRemaining < 0;
 
   String get statusLabel {
     switch (status) {

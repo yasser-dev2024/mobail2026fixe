@@ -317,19 +317,26 @@ class NotificationsRepository {
     return true;
   }
 
-  /// Check for maintenance tickets that stayed in the shop for 2+ days.
+  /// Check for maintenance tickets that exceeded their estimated delivery
+  /// date. Re-fires daily (the `type` includes the day) — combined with
+  /// [AlertMonitorService]'s generic snooze/stop engine, a specific day's
+  /// alert can still be individually snoozed/stopped without suppressing the
+  /// next day's.
   Future<int> _checkDevicesStayingTwoDays() async {
-    final cutoff =
-        DateTime.now().subtract(const Duration(days: 2)).millisecondsSinceEpoch;
+    final now = DateTime.now();
+    final cutoff = now.millisecondsSinceEpoch;
+    final dailyKey =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     final shopId = await _db.getCurrentShopId();
 
     final rows = await _db.rawQuery(
-      '''SELECT m.id, m.ticket_number, m.brand, m.model, m.status, m.received_at, c.name as customer_name
+      '''SELECT m.id, m.ticket_number, m.brand, m.model, m.status, m.received_at, m.estimated_delivery, c.name as customer_name
          FROM maintenance m
          LEFT JOIN customers c ON m.customer_id = c.id AND c.shop_id = m.shop_id
          WHERE m.shop_id = ?
-           AND m.received_at <= ?
-           AND m.status NOT IN (?, ?)
+           AND m.estimated_delivery IS NOT NULL
+           AND m.estimated_delivery < ?
+           AND m.status NOT IN (?, ?, ?, ?)
            AND m.deleted_at IS NULL
          ORDER BY m.received_at ASC''',
       [
@@ -337,6 +344,8 @@ class NotificationsRepository {
         cutoff,
         AppConstants.statusDelivered,
         AppConstants.statusCancelled,
+        AppConstants.statusUnrepairable,
+        AppConstants.statusAbandoned,
       ],
     );
 
@@ -348,21 +357,28 @@ class NotificationsRepository {
       final model = row['model'] as String? ?? '';
       final status = row['status'] as String? ?? '';
       final receivedAt = row['received_at'] as int?;
+      final expectedAt = row['estimated_delivery'] as int?;
       final customerName = row['customer_name'] as String? ?? 'عميل';
       final daysInShop = receivedAt == null
-          ? 2
+          ? 0
           : DateTime.now()
               .difference(DateTime.fromMillisecondsSinceEpoch(receivedAt))
               .inDays;
+      final overdueDays = expectedAt == null
+          ? 0
+          : now
+                  .difference(DateTime.fromMillisecondsSinceEpoch(expectedAt))
+                  .inDays +
+              1;
 
       final added = await _addIfNew(
         referenceId: id,
         referenceType: 'maintenance',
-        type: 'device_stay_two_days',
-        priority: AppConstants.priorityHigh,
-        title: 'جوال بقي في المحل يومين',
+        type: 'maintenance_overdue_$dailyKey',
+        priority: AppConstants.priorityCritical,
+        title: 'تجاوز مدة الصيانة المتوقعة',
         message:
-            'الجوال $brand $model للعميل $customerName بقي في المحل منذ $daysInShop يوم. رقم الصيانة: $ticketNumber. الحالة الحالية: ${AppConstants.maintenanceStatusLabel(status)}.',
+            'الجهاز $brand $model للعميل $customerName تجاوز الموعد المتوقع منذ $overdueDays يوم (موجود بالمركز منذ $daysInShop يوم). رقم الصيانة: $ticketNumber. الحالة: ${AppConstants.maintenanceStatusLabel(status)}.',
       );
       if (added) created++;
     }

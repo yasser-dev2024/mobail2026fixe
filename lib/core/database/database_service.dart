@@ -921,7 +921,8 @@ class DatabaseService {
       'license_number': '',
       'shop_whatsapp': '',
       'map_url': '',
-      'tracking_base_url': 'proshop:///track',
+      'tracking_base_url':
+          'https://yasser-dev2024.github.io/mobail2026fixe/track/?ticket={ticket}',
       'privacy_policy_url': '',
       'privacy_policy_accepted_version': '',
       'privacy_policy_accepted_at': '',

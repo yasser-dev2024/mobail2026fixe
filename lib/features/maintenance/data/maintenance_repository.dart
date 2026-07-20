@@ -4,6 +4,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/database/database_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../whatsapp/data/whatsapp_repository.dart';
+import '../../tracking/services/remote_tracking_service.dart';
 import 'maintenance_model.dart';
 import 'maintenance_part_model.dart';
 import 'maintenance_image_model.dart';
@@ -136,6 +137,7 @@ ORDER BY m.created_at DESC
     );
     await _syncWarranty(normalized);
     await _syncFinancials(id);
+    await RemoteTrackingService().syncTicket(normalized.ticketNumber);
     await WhatsappRepository()
         .prepareAndMaybeAutoSend(id, AppConstants.waMsgReceived);
     if (normalized.status != AppConstants.statusNew) {
@@ -173,6 +175,7 @@ ORDER BY m.created_at DESC
     }
     await _syncWarranty(normalized);
     await _syncFinancials(normalized.id);
+    await RemoteTrackingService().syncTicket(normalized.ticketNumber);
     if (normalized.status != AppConstants.statusNew) {
       await _addStatusNotification(normalized.id, normalized.status);
     }
@@ -239,6 +242,9 @@ ORDER BY m.created_at DESC
       reason: reason,
       notes: notes,
     );
+    if (updated != null) {
+      await RemoteTrackingService().syncTicket(updated.ticketNumber);
+    }
     // Write immutable audit entry
     await logAudit(
       maintenanceId: id,

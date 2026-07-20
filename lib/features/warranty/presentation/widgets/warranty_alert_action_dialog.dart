@@ -52,8 +52,9 @@ class _WarrantyAlertActionDialogState extends State<WarrantyAlertActionDialog> {
   }
 
   void _reload() {
+    final next = _repo.getAlertDetails(widget.warrantyId);
     setState(() {
-      _future = _repo.getAlertDetails(widget.warrantyId);
+      _future = next;
     });
   }
 
@@ -430,18 +431,10 @@ class _WarrantyAlertActionDialogState extends State<WarrantyAlertActionDialog> {
                 child: Text('إلغاء', style: GoogleFonts.cairo()),
               ),
               ElevatedButton.icon(
-                onPressed: () async {
+                onPressed: () {
                   final duration = int.tryParse(durationCtrl.text.trim()) ?? 0;
                   if (duration <= 0) return;
-                  final confirmed = await _confirm(
-                    ctx,
-                    title: 'تأكيد تجديد الضمان',
-                    message:
-                        'سيتم حفظ مدة الضمان السابقة والجديدة وتحديث تاريخ انتهاء الضمان إلى ${_date(calculatedEnd)}.',
-                    confirmLabel: 'تأكيد التجديد',
-                    color: AppColors.primary,
-                  );
-                  if (confirmed && ctx.mounted) Navigator.pop(ctx, true);
+                  Navigator.pop(ctx, true);
                 },
                 icon: const Icon(Icons.update_rounded),
                 label: Text('تجديد الضمان', style: GoogleFonts.cairo()),
@@ -453,8 +446,19 @@ class _WarrantyAlertActionDialogState extends State<WarrantyAlertActionDialog> {
     );
 
     final duration = int.tryParse(durationCtrl.text.trim()) ?? 0;
+    final renewalEnd = endDate();
     durationCtrl.dispose();
     if (saved != true || duration <= 0) return;
+    if (!mounted) return;
+    final confirmed = await _confirm(
+      context,
+      title: 'تأكيد تجديد الضمان',
+      message:
+          'سيتم حفظ مدة الضمان السابقة والجديدة وتحديث تاريخ انتهاء الضمان إلى ${_date(renewalEnd)}.',
+      confirmLabel: 'تأكيد التجديد',
+      color: AppColors.primary,
+    );
+    if (!confirmed || !mounted) return;
     await _runAction(
       () => _repo.renewWarranty(
         warrantyId: details.warranty.id,

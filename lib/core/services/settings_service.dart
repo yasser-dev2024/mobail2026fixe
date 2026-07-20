@@ -7,7 +7,8 @@ class SettingsService {
   SettingsService._internal();
 
   static const defaultShopName = 'محل جوالات ProShop';
-  static const defaultTrackingBaseUrl = 'proshop:///track';
+  static const defaultTrackingBaseUrl =
+      'https://yasser-dev2024.github.io/mobail2026fixe/track/?ticket={ticket}';
 
   final DatabaseService _db = DatabaseService();
 
@@ -212,7 +213,8 @@ class SettingsService {
   bool _isUnsupportedTrackingUrl(String value) {
     final lower = value.toLowerCase();
     return _isLegacyExternalUrl(lower) ||
-        lower.contains('proshop://') ||
+        lower.contains('proshop.example.com') ||
+        lower.startsWith('proshop://') ||
         lower.contains('proshop.local');
   }
 }

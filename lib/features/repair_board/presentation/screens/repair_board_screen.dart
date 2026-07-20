@@ -297,12 +297,14 @@ class _RepairBoardScreenState extends State<RepairBoardScreen> {
     );
   }
 
-  Future<void> _manageWarrantyAlert(WarrantyModel warranty) async {
+  Future<void> _manageWarranty(WarrantyModel warranty) async {
     final changed = await showWarrantyAlertActionDialog(
       context,
       warrantyId: warranty.id,
     );
-    if (changed == true) await _load();
+    if (changed == true && mounted) {
+      await _load();
+    }
   }
 
   Future<void> _confirmDeleteCustomer({
@@ -563,7 +565,7 @@ class _RepairBoardScreenState extends State<RepairBoardScreen> {
                               activeMaintenanceIds: data.activeMaintenanceIds,
                               onReceiveUnderWarranty: _receiveUnderWarranty,
                               onWarrantyWhatsapp: _sendWarrantyWhatsapp,
-                              onManage: _manageWarrantyAlert,
+                              onManageWarranty: _manageWarranty,
                             ),
                           ),
                         ],
@@ -595,7 +597,7 @@ class _RepairBoardScreenState extends State<RepairBoardScreen> {
                             activeMaintenanceIds: data.activeMaintenanceIds,
                             onReceiveUnderWarranty: _receiveUnderWarranty,
                             onWarrantyWhatsapp: _sendWarrantyWhatsapp,
-                            onManage: _manageWarrantyAlert,
+                            onManageWarranty: _manageWarranty,
                           ),
                         ),
                       ],
@@ -1386,14 +1388,14 @@ class _WarrantySection extends StatelessWidget {
   final Set<String> activeMaintenanceIds;
   final ValueChanged<WarrantyModel> onReceiveUnderWarranty;
   final ValueChanged<WarrantyModel> onWarrantyWhatsapp;
-  final ValueChanged<WarrantyModel> onManage;
+  final ValueChanged<WarrantyModel> onManageWarranty;
 
   const _WarrantySection({
     required this.warranties,
     required this.activeMaintenanceIds,
     required this.onReceiveUnderWarranty,
     required this.onWarrantyWhatsapp,
-    required this.onManage,
+    required this.onManageWarranty,
   });
 
   @override
@@ -1407,10 +1409,15 @@ class _WarrantySection extends StatelessWidget {
               title: 'لا توجد ضمانات',
               subtitle: 'بعد تسليم جهاز بضمان سيظهر هنا.',
             )
-          : ListView.separated(
+          : GridView.builder(
               padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 210,
+                mainAxisExtent: 210,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
               itemCount: warranties.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 6),
               itemBuilder: (context, index) {
                 final warranty = warranties[index];
                 final alreadyInside =
@@ -1424,7 +1431,7 @@ class _WarrantySection extends StatelessWidget {
                   onWhatsapp: warranty.status == 'expired'
                       ? null
                       : () => onWarrantyWhatsapp(warranty),
-                  onManage: () => onManage(warranty),
+                  onManage: () => onManageWarranty(warranty),
                 );
               },
             ),
@@ -1764,95 +1771,132 @@ class _WarrantyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _warrantyColor(warranty.status);
-    final title = _warrantyTitle(warranty.status);
-    final start = _date(warranty.startDate);
-    final end = _date(warranty.endDate);
 
     return _BlinkingAlertFrame(
       color: color,
       enabled: warranty.status != 'active' || alreadyInside,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onManage,
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withValues(alpha: 0.35)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      warranty.customerName ?? 'عميل',
-                      style: GoogleFonts.cairo(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+      child: Material(
+        color: context.appColors.surface,
+        elevation: 3,
+        shadowColor: color.withValues(alpha: 0.3),
+        shape: CircleBorder(
+          side: BorderSide(color: color.withValues(alpha: 0.8), width: 3),
+        ),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => _showActions(context),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.verified_user_rounded, color: color, size: 26),
+                const SizedBox(height: 7),
+                Text(
+                  warranty.customerName ?? 'عميل',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
                   ),
-                  _SmallBadge(label: title, color: color, compact: true),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                warranty.deviceInfo,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.cairo(fontSize: 11),
-              ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 5,
-                runSpacing: 2,
-                children: [
-                  _MiniText('من: $start'),
-                  _MiniText('إلى: $end'),
-                  _MiniText(
-                    _warrantyCountdownLabel(warranty),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  warranty.deviceInfo,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(fontSize: 12.5),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  warranty.customerPhone?.trim().isNotEmpty == true
+                      ? warranty.customerPhone!
+                      : 'بدون رقم جوال',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textDirection: TextDirection.ltr,
+                  style: GoogleFonts.cairo(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
                     color: color,
                   ),
-                ],
-              ),
-              if (alreadyInside) ...[
-                const SizedBox(height: 5),
-                _SmallBadge(
-                  label: 'الجهاز موجود حالياً في المحل',
-                  color: color,
-                  compact: true,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _warrantyCountdownLabel(warranty),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                  ),
                 ),
               ],
-              if (onWhatsapp != null || onReceive != null) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    if (onWhatsapp != null)
-                      Expanded(
-                        child: _CompactOutlinedAction(
-                          onPressed: onWhatsapp,
-                          icon: Icons.chat_rounded,
-                          label: 'واتساب الضمان',
-                          height: 32,
-                          fontSize: 11,
-                        ),
-                      ),
-                    if (onWhatsapp != null && onReceive != null)
-                      const SizedBox(width: 6),
-                    if (onReceive != null)
-                      Expanded(
-                        child: _CompactOutlinedAction(
-                          onPressed: onReceive,
-                          icon: Icons.assignment_return_rounded,
-                          label: 'استلام ضمان',
-                          height: 32,
-                          fontSize: 11,
-                        ),
-                      ),
-                  ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showActions(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${warranty.customerName ?? 'عميل'} — ${warranty.deviceInfo}',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.cairo(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(sheetContext);
+                  onManage();
+                },
+                icon: const Icon(Icons.admin_panel_settings_rounded),
+                label: Text(
+                  'إدارة الضمان: تمديد أو اعتماد الانتهاء',
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (onReceive != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    onReceive!();
+                  },
+                  icon: const Icon(Icons.assignment_return_rounded),
+                  label: Text('استلام الجهاز تحت الضمان',
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.w700)),
+                ),
+              ],
+              if (onWhatsapp != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    onWhatsapp!();
+                  },
+                  icon: const Icon(Icons.chat_rounded),
+                  label: Text('إرسال الضمان عبر واتساب',
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.w700)),
                 ),
               ],
             ],
@@ -2168,10 +2212,12 @@ class _HoverLiftState extends State<_HoverLift> {
   }
 }
 
+// ignore: unused_element
 class _MiniText extends StatelessWidget {
   final String text;
   final Color? color;
 
+  // ignore: unused_element_parameter
   const _MiniText(this.text, {this.color});
 
   @override
@@ -2211,7 +2257,7 @@ class _BlinkingAlertFrameState extends State<_BlinkingAlertFrame>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 780),
+      duration: const Duration(milliseconds: 480),
     );
     _sync();
   }
@@ -2249,17 +2295,17 @@ class _BlinkingAlertFrameState extends State<_BlinkingAlertFrame>
         return Container(
           padding: const EdgeInsets.all(2),
           decoration: BoxDecoration(
-            color: widget.color.withValues(alpha: 0.025 + (pulse * 0.055)),
+            color: widget.color.withValues(alpha: 0.03 + (pulse * 0.16)),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: widget.color.withValues(alpha: 0.35 + (pulse * 0.42)),
-              width: 1.1 + (pulse * 0.7),
+              color: widget.color.withValues(alpha: 0.32 + (pulse * 0.66)),
+              width: 1.2 + (pulse * 1.8),
             ),
             boxShadow: [
               BoxShadow(
-                color: widget.color.withValues(alpha: 0.13 + (pulse * 0.18)),
-                blurRadius: 7 + (pulse * 12),
-                spreadRadius: 0.5 + (pulse * 2),
+                color: widget.color.withValues(alpha: 0.12 + (pulse * 0.42)),
+                blurRadius: 6 + (pulse * 20),
+                spreadRadius: 1 + (pulse * 5),
               ),
             ],
           ),
@@ -2563,6 +2609,7 @@ class _IntakeDialogState extends State<_IntakeDialog> {
   bool _works = true;
   bool _charges = true;
   bool _water = false;
+  int _expectedRepairDays = 2;
   final List<String> _images = [];
   final _customersRepo = CustomersRepository();
   final _devicesRepo = DevicesRepository();
@@ -2757,6 +2804,7 @@ class _IntakeDialogState extends State<_IntakeDialog> {
         waterDamage: _water,
         extraNotes: _notes.text,
         imagePaths: List.unmodifiable(_images),
+        expectedRepairDays: _expectedRepairDays,
       ),
     );
   }
@@ -2961,6 +3009,70 @@ class _IntakeDialogState extends State<_IntakeDialog> {
                     _TextFieldBox(
                       controller: _accessories,
                       label: 'الملحقات المستلمة',
+                    ),
+                  ],
+                ),
+                _DialogSection(
+                  title: 'مدة الصيانة والتنبيه',
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.65),
+                          width: 1.6,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'المدة المتوقعة للصيانة (أساس التنبيه)',
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.w900,
+                              color: context.appColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'بعد تجاوزها يظهر تنبيه قوي ويتكرر يومياً حتى اتخاذ إجراء نهائي.',
+                            style: GoogleFonts.cairo(
+                              fontSize: 12,
+                              color: context.appColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<int>(
+                            value: _expectedRepairDays,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'اختر المدة المتوقعة',
+                              prefixIcon: Icon(Icons.timer_rounded),
+                              suffixText: 'يوم',
+                            ),
+                            items: List.generate(30, (index) => index + 1)
+                                .map(
+                                  (days) => DropdownMenuItem(
+                                    value: days,
+                                    child: Text(
+                                      days == 1 ? 'يوم واحد' : '$days أيام',
+                                      style: GoogleFonts.cairo(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (days) {
+                              if (days != null) {
+                                setState(() => _expectedRepairDays = days);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -4224,20 +4336,18 @@ class _InfoPill extends StatelessWidget {
 class _SmallBadge extends StatelessWidget {
   final String label;
   final Color color;
-  final bool compact;
 
   const _SmallBadge({
     required this.label,
     required this.color,
-    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 7 : 10,
-        vertical: compact ? 3 : 5,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 5,
       ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
@@ -4245,13 +4355,13 @@ class _SmallBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: compact ? 164 : 240),
+        constraints: const BoxConstraints(maxWidth: 240),
         child: Text(
           label,
-          maxLines: compact ? 1 : 2,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.cairo(
-            fontSize: compact ? 10.5 : 12,
+            fontSize: 12,
             fontWeight: FontWeight.w800,
             color: color,
           ),
@@ -4522,6 +4632,7 @@ Color _warrantyColor(String status) {
   }
 }
 
+// ignore: unused_element
 String _warrantyTitle(String status) {
   switch (status) {
     case 'active':
@@ -4601,6 +4712,7 @@ String _elapsedSince(int milliseconds) {
   return '$minutes دقيقة';
 }
 
+// ignore: unused_element
 String _date(int milliseconds) {
   final date = DateTime.fromMillisecondsSinceEpoch(milliseconds);
   return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
