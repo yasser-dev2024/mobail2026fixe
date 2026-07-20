@@ -7,7 +7,7 @@ class SettingsService {
   SettingsService._internal();
 
   static const defaultShopName = 'محل جوالات ProShop';
-  static const defaultTrackingBaseUrl = 'https://proshop.example.com/track';
+  static const defaultTrackingBaseUrl = 'proshop:///track';
 
   final DatabaseService _db = DatabaseService();
 
@@ -83,6 +83,30 @@ class SettingsService {
   bool get invoiceShowSignature => _cache['invoice_show_signature'] != 'false';
   bool get autoBackup => _cache['auto_backup'] == 'true';
   bool get autoWhatsappSend => _cache['auto_whatsapp_send'] == 'true';
+  bool get alertSoundsEnabled => _cache['alert_sounds_enabled'] != 'false';
+  String get deviceStayAlertSoundPath =>
+      _cache['device_stay_alert_sound_path'] ?? '';
+  String get warrantyAlertSoundPath =>
+      _cache['warranty_alert_sound_path'] ?? '';
+  int get alertCheckIntervalMinutes {
+    final minutes = int.tryParse(_cache['alert_check_interval_minutes'] ?? '');
+    return (minutes == null || minutes <= 0) ? 30 : minutes;
+  }
+
+  double get alertVolume {
+    final volume = double.tryParse(_cache['alert_volume'] ?? '');
+    return (volume == null) ? 1.0 : volume.clamp(0.0, 1.0);
+  }
+
+  bool get alertVibrationEnabled =>
+      _cache['alert_vibration_enabled'] != 'false';
+
+  /// `0` or negative means "repeat until stopped".
+  int get alertRepeatCount =>
+      int.tryParse(_cache['alert_repeat_count'] ?? '') ?? 1;
+
+  bool get whatsappMessageTypesMasterEnabled =>
+      _cache['whatsapp_message_types_master_enabled'] != 'false';
   bool get shopSetupCompleted => _cache['shop_setup_completed'] == 'true';
   int get autoBackupInterval {
     final days = int.tryParse(_cache['auto_backup_interval'] ?? '') ??

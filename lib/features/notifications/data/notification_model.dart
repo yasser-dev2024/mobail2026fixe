@@ -12,6 +12,11 @@ class NotificationModel {
   final String? referenceType;
   final bool isRead;
   final int createdAt;
+  final int? snoozedUntil;
+  final bool alertStopped;
+  final int? alertStoppedAt;
+  final String? alertStoppedBy;
+  final int? lastFiredAt;
 
   const NotificationModel({
     required this.id,
@@ -24,6 +29,11 @@ class NotificationModel {
     this.referenceType,
     this.isRead = false,
     required this.createdAt,
+    this.snoozedUntil,
+    this.alertStopped = false,
+    this.alertStoppedAt,
+    this.alertStoppedBy,
+    this.lastFiredAt,
   });
 
   factory NotificationModel.fromMap(Map<String, dynamic> map) {
@@ -38,6 +48,11 @@ class NotificationModel {
       referenceType: map['reference_type'] as String?,
       isRead: (map['is_read'] as int? ?? 0) == 1,
       createdAt: map['created_at'] as int,
+      snoozedUntil: map['snoozed_until'] as int?,
+      alertStopped: (map['alert_stopped'] as int? ?? 0) == 1,
+      alertStoppedAt: map['alert_stopped_at'] as int?,
+      alertStoppedBy: map['alert_stopped_by'] as String?,
+      lastFiredAt: map['last_fired_at'] as int?,
     );
   }
 
@@ -53,6 +68,11 @@ class NotificationModel {
       'reference_type': referenceType,
       'is_read': isRead ? 1 : 0,
       'created_at': createdAt,
+      'snoozed_until': snoozedUntil,
+      'alert_stopped': alertStopped ? 1 : 0,
+      'alert_stopped_at': alertStoppedAt,
+      'alert_stopped_by': alertStoppedBy,
+      'last_fired_at': lastFiredAt,
     };
   }
 
@@ -75,12 +95,17 @@ class NotificationModel {
     if (type.startsWith('maintenance_status_')) {
       return Icons.campaign_rounded;
     }
+    if (type.startsWith('warranty_')) {
+      return Icons.verified_user_rounded;
+    }
     if (type == 'device_manual') {
       return Icons.phone_in_talk_rounded;
     }
     switch (type) {
       case 'maintenance_ready':
         return Icons.check_circle_rounded;
+      case 'device_stay_two_days':
+        return Icons.timer_rounded;
       case 'warranty_expiring':
         return Icons.verified_user_rounded;
       case 'low_stock':
@@ -116,6 +141,11 @@ class NotificationModel {
     String? referenceType,
     bool? isRead,
     int? createdAt,
+    int? snoozedUntil,
+    bool? alertStopped,
+    int? alertStoppedAt,
+    String? alertStoppedBy,
+    int? lastFiredAt,
   }) {
     return NotificationModel(
       id: id ?? this.id,
@@ -128,6 +158,33 @@ class NotificationModel {
       referenceType: referenceType ?? this.referenceType,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
+      snoozedUntil: snoozedUntil ?? this.snoozedUntil,
+      alertStopped: alertStopped ?? this.alertStopped,
+      alertStoppedAt: alertStoppedAt ?? this.alertStoppedAt,
+      alertStoppedBy: alertStoppedBy ?? this.alertStoppedBy,
+      lastFiredAt: lastFiredAt ?? this.lastFiredAt,
     );
   }
+}
+
+/// Extra customer/device/ticket context for the recurring alert popup,
+/// looked up alongside a [NotificationModel] so the dialog can show a
+/// contact number and an "open ticket" action regardless of which check
+/// (device-stay, warranty, or a future type) produced the notification.
+class AlertPopupDetails {
+  final NotificationModel notification;
+  final String? customerName;
+  final String? customerPhone;
+  final String? deviceName;
+  final String? ticketNumber;
+  final String? maintenanceId;
+
+  const AlertPopupDetails({
+    required this.notification,
+    this.customerName,
+    this.customerPhone,
+    this.deviceName,
+    this.ticketNumber,
+    this.maintenanceId,
+  });
 }

@@ -23,6 +23,7 @@ import '../../../device_photos/data/device_photo_repository.dart';
 import '../../../devices/data/device_model.dart';
 import '../../../devices/data/devices_repository.dart';
 import '../../../warranty/data/warranty_model.dart';
+import '../../../warranty/presentation/widgets/warranty_alert_action_dialog.dart';
 import '../../data/repair_board_repository.dart';
 
 const _receiveGraphicAsset = 'assets/images/workflow_receive.png';
@@ -296,6 +297,14 @@ class _RepairBoardScreenState extends State<RepairBoardScreen> {
     );
   }
 
+  Future<void> _manageWarrantyAlert(WarrantyModel warranty) async {
+    final changed = await showWarrantyAlertActionDialog(
+      context,
+      warrantyId: warranty.id,
+    );
+    if (changed == true) await _load();
+  }
+
   Future<void> _confirmDeleteCustomer({
     required String customerId,
     required String customerName,
@@ -554,6 +563,7 @@ class _RepairBoardScreenState extends State<RepairBoardScreen> {
                               activeMaintenanceIds: data.activeMaintenanceIds,
                               onReceiveUnderWarranty: _receiveUnderWarranty,
                               onWarrantyWhatsapp: _sendWarrantyWhatsapp,
+                              onManage: _manageWarrantyAlert,
                             ),
                           ),
                         ],
@@ -585,6 +595,7 @@ class _RepairBoardScreenState extends State<RepairBoardScreen> {
                             activeMaintenanceIds: data.activeMaintenanceIds,
                             onReceiveUnderWarranty: _receiveUnderWarranty,
                             onWarrantyWhatsapp: _sendWarrantyWhatsapp,
+                            onManage: _manageWarrantyAlert,
                           ),
                         ),
                       ],
@@ -1375,12 +1386,14 @@ class _WarrantySection extends StatelessWidget {
   final Set<String> activeMaintenanceIds;
   final ValueChanged<WarrantyModel> onReceiveUnderWarranty;
   final ValueChanged<WarrantyModel> onWarrantyWhatsapp;
+  final ValueChanged<WarrantyModel> onManage;
 
   const _WarrantySection({
     required this.warranties,
     required this.activeMaintenanceIds,
     required this.onReceiveUnderWarranty,
     required this.onWarrantyWhatsapp,
+    required this.onManage,
   });
 
   @override
@@ -1411,6 +1424,7 @@ class _WarrantySection extends StatelessWidget {
                   onWhatsapp: warranty.status == 'expired'
                       ? null
                       : () => onWarrantyWhatsapp(warranty),
+                  onManage: () => onManage(warranty),
                 );
               },
             ),
@@ -1737,12 +1751,14 @@ class _WarrantyCard extends StatelessWidget {
   final bool alreadyInside;
   final VoidCallback? onReceive;
   final VoidCallback? onWhatsapp;
+  final VoidCallback onManage;
 
   const _WarrantyCard({
     required this.warranty,
     required this.alreadyInside,
     required this.onReceive,
     required this.onWhatsapp,
+    required this.onManage,
   });
 
   @override
@@ -1755,88 +1771,92 @@ class _WarrantyCard extends StatelessWidget {
     return _BlinkingAlertFrame(
       color: color,
       enabled: warranty.status != 'active' || alreadyInside,
-      child: Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    warranty.customerName ?? 'عميل',
-                    style: GoogleFonts.cairo(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                _SmallBadge(label: title, color: color, compact: true),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              warranty.deviceInfo,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.cairo(fontSize: 11),
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 5,
-              runSpacing: 2,
-              children: [
-                _MiniText('من: $start'),
-                _MiniText('إلى: $end'),
-                _MiniText(
-                  _warrantyCountdownLabel(warranty),
-                  color: color,
-                ),
-              ],
-            ),
-            if (alreadyInside) ...[
-              const SizedBox(height: 5),
-              _SmallBadge(
-                label: 'الجهاز موجود حالياً في المحل',
-                color: color,
-                compact: true,
-              ),
-            ],
-            if (onWhatsapp != null || onReceive != null) ...[
-              const SizedBox(height: 6),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onManage,
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
                 children: [
-                  if (onWhatsapp != null)
-                    Expanded(
-                      child: _CompactOutlinedAction(
-                        onPressed: onWhatsapp,
-                        icon: Icons.chat_rounded,
-                        label: 'واتساب الضمان',
-                        height: 32,
-                        fontSize: 11,
+                  Expanded(
+                    child: Text(
+                      warranty.customerName ?? 'عميل',
+                      style: GoogleFonts.cairo(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                  if (onWhatsapp != null && onReceive != null)
-                    const SizedBox(width: 6),
-                  if (onReceive != null)
-                    Expanded(
-                      child: _CompactOutlinedAction(
-                        onPressed: onReceive,
-                        icon: Icons.assignment_return_rounded,
-                        label: 'استلام ضمان',
-                        height: 32,
-                        fontSize: 11,
-                      ),
-                    ),
+                  ),
+                  _SmallBadge(label: title, color: color, compact: true),
                 ],
               ),
+              const SizedBox(height: 4),
+              Text(
+                warranty.deviceInfo,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.cairo(fontSize: 11),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 5,
+                runSpacing: 2,
+                children: [
+                  _MiniText('من: $start'),
+                  _MiniText('إلى: $end'),
+                  _MiniText(
+                    _warrantyCountdownLabel(warranty),
+                    color: color,
+                  ),
+                ],
+              ),
+              if (alreadyInside) ...[
+                const SizedBox(height: 5),
+                _SmallBadge(
+                  label: 'الجهاز موجود حالياً في المحل',
+                  color: color,
+                  compact: true,
+                ),
+              ],
+              if (onWhatsapp != null || onReceive != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    if (onWhatsapp != null)
+                      Expanded(
+                        child: _CompactOutlinedAction(
+                          onPressed: onWhatsapp,
+                          icon: Icons.chat_rounded,
+                          label: 'واتساب الضمان',
+                          height: 32,
+                          fontSize: 11,
+                        ),
+                      ),
+                    if (onWhatsapp != null && onReceive != null)
+                      const SizedBox(width: 6),
+                    if (onReceive != null)
+                      Expanded(
+                        child: _CompactOutlinedAction(
+                          onPressed: onReceive,
+                          icon: Icons.assignment_return_rounded,
+                          label: 'استلام ضمان',
+                          height: 32,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

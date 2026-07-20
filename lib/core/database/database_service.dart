@@ -70,6 +70,7 @@ class DatabaseService {
     _createMaintenanceImagesTable(batch);
     _createWarrantyTable(batch);
     _createWarrantyClaimsTable(batch);
+    _createWarrantyActionsTable(batch);
     _createProductsTable(batch);
     _createSuppliersTable(batch);
     _createPurchasesTable(batch);
@@ -93,6 +94,7 @@ class DatabaseService {
     _createBackupLogsTable(batch);
     await batch.commit(noResult: true);
     await _insertDefaultData(db);
+    await _ensureWhatsappMessageTemplateSeeds(db);
     await _ensureLocalShopIdentity(db);
   }
 
@@ -159,6 +161,13 @@ class DatabaseService {
     }
     if (oldVersion < 9) {
       await _ensureNotificationShopScope(db);
+    }
+    if (oldVersion < 10) {
+      await _ensureWarrantyManagementSchema(db);
+    }
+    if (oldVersion < 11) {
+      await _ensureAlertRecurrenceSchema(db);
+      await _ensureWhatsappMessageTemplateSeeds(db);
     }
   }
 
@@ -380,6 +389,13 @@ class DatabaseService {
       end_date INTEGER NOT NULL,
       notes TEXT,
       is_void INTEGER NOT NULL DEFAULT 0,
+      alert_disabled INTEGER NOT NULL DEFAULT 0,
+      alert_disabled_reason TEXT,
+      alert_disabled_at INTEGER,
+      alert_disabled_by TEXT,
+      expiry_approved INTEGER NOT NULL DEFAULT 0,
+      expiry_approved_at INTEGER,
+      expiry_approved_by TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (maintenance_id) REFERENCES maintenance(id)
@@ -403,6 +419,29 @@ class DatabaseService {
       resolved_at INTEGER,
       FOREIGN KEY (warranty_id) REFERENCES warranties(id)
     )''');
+  }
+
+  void _createWarrantyActionsTable(Batch batch) {
+    batch.execute('''CREATE TABLE IF NOT EXISTS warranty_actions (
+      id TEXT PRIMARY KEY,
+      shop_id TEXT NOT NULL DEFAULT 'default_shop',
+      warranty_id TEXT NOT NULL,
+      maintenance_id TEXT,
+      action TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      user_id TEXT,
+      username TEXT,
+      notes TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (warranty_id) REFERENCES warranties(id)
+    )''');
+    batch.execute(
+        'CREATE INDEX IF NOT EXISTS idx_wactions_warranty ON warranty_actions(warranty_id)');
+    batch.execute(
+        'CREATE INDEX IF NOT EXISTS idx_wactions_shop ON warranty_actions(shop_id)');
+    batch.execute(
+        'CREATE INDEX IF NOT EXISTS idx_wactions_created ON warranty_actions(created_at)');
   }
 
   void _createProductsTable(Batch batch) {
@@ -561,12 +600,21 @@ class DatabaseService {
       reference_id TEXT,
       reference_type TEXT,
       is_read INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      snoozed_until INTEGER,
+      alert_stopped INTEGER NOT NULL DEFAULT 0,
+      alert_stopped_at INTEGER,
+      alert_stopped_by TEXT,
+      last_fired_at INTEGER
     )''');
     batch.execute('CREATE INDEX idx_notif_shop ON notifications(shop_id)');
     batch.execute('CREATE INDEX idx_notif_read ON notifications(is_read)');
     batch
         .execute('CREATE INDEX idx_notif_created ON notifications(created_at)');
+    batch.execute(
+        'CREATE INDEX idx_notif_stopped ON notifications(alert_stopped)');
+    batch.execute(
+        'CREATE INDEX idx_notif_snoozed ON notifications(snoozed_until)');
   }
 
   void _createWhatsappTemplatesTable(Batch batch) {
@@ -873,7 +921,7 @@ class DatabaseService {
       'license_number': '',
       'shop_whatsapp': '',
       'map_url': '',
-      'tracking_base_url': 'https://proshop.example.com/track',
+      'tracking_base_url': 'proshop:///track',
       'privacy_policy_url': '',
       'privacy_policy_accepted_version': '',
       'privacy_policy_accepted_at': '',
@@ -905,6 +953,14 @@ class DatabaseService {
       'photo_report_images_per_page': '4',
       'photo_show_employee': 'true',
       'photo_show_datetime': 'true',
+      'alert_sounds_enabled': 'true',
+      'device_stay_alert_sound_path': '',
+      'warranty_alert_sound_path': '',
+      'alert_check_interval_minutes': '30',
+      'alert_volume': '1.0',
+      'alert_vibration_enabled': 'true',
+      'alert_repeat_count': '1',
+      'whatsapp_message_types_master_enabled': 'true',
     };
     for (final entry in defaults.entries) {
       batch.insert(
@@ -1063,6 +1119,7 @@ class DatabaseService {
       'device_reports',
       'backup_logs',
       'notifications',
+      'warranty_actions',
     ]) {
       try {
         await db.update(
@@ -1150,6 +1207,117 @@ class DatabaseService {
         [setupAt > 0 ? legacyShopId : shopId],
       );
     } catch (_) {}
+  }
+
+  Future<void> _ensureWarrantyManagementSchema(Database db) async {
+    for (final column in const [
+      "alert_disabled INTEGER NOT NULL DEFAULT 0",
+      "alert_disabled_reason TEXT",
+      "alert_disabled_at INTEGER",
+      "alert_disabled_by TEXT",
+      "expiry_approved INTEGER NOT NULL DEFAULT 0",
+      "expiry_approved_at INTEGER",
+      "expiry_approved_by TEXT",
+    ]) {
+      try {
+        await db.execute('ALTER TABLE warranties ADD COLUMN $column');
+      } catch (_) {
+        // Column may already exist on development databases.
+      }
+    }
+
+    final batch = db.batch();
+    _createWarrantyActionsTable(batch);
+    await batch.commit(noResult: true);
+
+    await _ensureLocalShopIdentity(db);
+    final shopId = await _readSettingFromDb(db, 'shop_id') ?? 'default_shop';
+    try {
+      await db.rawUpdate(
+        "UPDATE warranty_actions SET shop_id = ("
+        "SELECT shop_id FROM warranties WHERE warranties.id = warranty_actions.warranty_id"
+        ") WHERE shop_id IS NULL OR shop_id = '' OR shop_id = 'default_shop'",
+      );
+      await db.rawUpdate(
+        "UPDATE warranty_actions SET shop_id = ? "
+        "WHERE shop_id IS NULL OR shop_id = '' OR shop_id = 'default_shop'",
+        [shopId],
+      );
+    } catch (_) {}
+  }
+
+  static const _wamsgTemplateKeyPrefix = 'wamsg_';
+
+  Future<void> _ensureAlertRecurrenceSchema(Database db) async {
+    for (final column in const [
+      'snoozed_until INTEGER',
+      'alert_stopped INTEGER NOT NULL DEFAULT 0',
+      'alert_stopped_at INTEGER',
+      'alert_stopped_by TEXT',
+      'last_fired_at INTEGER',
+    ]) {
+      try {
+        await db.execute('ALTER TABLE notifications ADD COLUMN $column');
+      } catch (_) {
+        // Column may already exist on development databases.
+      }
+    }
+    try {
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_notif_stopped ON notifications(alert_stopped)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_notif_snoozed ON notifications(snoozed_until)',
+      );
+    } catch (_) {}
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final batch = db.batch();
+    for (final entry in <String, String>{
+      'alert_check_interval_minutes': '30',
+      'alert_volume': '1.0',
+      'alert_vibration_enabled': 'true',
+      'alert_repeat_count': '1',
+      'whatsapp_message_types_master_enabled': 'true',
+    }.entries) {
+      batch.insert(
+        'settings',
+        {'key': entry.key, 'value': entry.value, 'updated_at': now},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Seeds one inactive-by-default-text `whatsapp_templates` row per
+  /// automatic maintenance-workflow message type (`wamsg_*` keys, distinct
+  /// from the manual-composer's `waTpl*` keys which reuse some of the same
+  /// raw strings, e.g. both have a 'ready' type). `template` is left empty
+  /// on purpose: `WhatsappRepository._buildMessage` only overrides its
+  /// existing hardcoded wording when a row's `template` is non-empty, so
+  /// seeding empty rows changes nothing until a shop owner writes their own
+  /// text in the new WhatsApp message settings page. `is_active` defaults to
+  /// 1 (message type enabled), matching today's behavior of every automatic
+  /// message being sent.
+  Future<void> _ensureWhatsappMessageTemplateSeeds(Database db) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final batch = db.batch();
+    for (final type in AppConstants.whatsappMessageTypeLabels.keys) {
+      batch.insert(
+        'whatsapp_templates',
+        {
+          'id': 'tpl_$_wamsgTemplateKeyPrefix$type',
+          'key': '$_wamsgTemplateKeyPrefix$type',
+          'name': AppConstants.whatsappMessageTypeLabels[type]!,
+          'template': '',
+          'is_active': 1,
+          'created_at': now,
+          'updated_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<void> _ensureNotificationShopScope(Database db) async {

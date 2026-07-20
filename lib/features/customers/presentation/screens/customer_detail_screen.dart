@@ -53,11 +53,21 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     setState(() => _loading = true);
     final customer = await _customersRepo.getById(widget.customerId);
     final devices = await _devicesRepo.getByCustomer(widget.customerId);
-    final maintRows = await _db.query(
-      'maintenance',
-      where: 'customer_id = ? AND deleted_at IS NULL',
-      whereArgs: [widget.customerId],
-      orderBy: 'created_at DESC',
+    final shopId = await _db.getCurrentShopId();
+    final maintRows = await _db.rawQuery(
+      '''
+SELECT m.*,
+       w.expiry_approved AS warranty_expiry_approved,
+       w.expiry_approved_at AS warranty_expiry_approved_at,
+       w.expiry_approved_by AS warranty_expiry_approved_by
+FROM maintenance m
+LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id
+WHERE m.shop_id = ?
+  AND m.customer_id = ?
+  AND m.deleted_at IS NULL
+ORDER BY m.created_at DESC
+''',
+      [shopId, widget.customerId],
     );
     final maintenances = maintRows.map(MaintenanceModel.fromMap).toList();
 
@@ -850,6 +860,8 @@ class _MaintenanceMiniTile extends StatelessWidget {
                       fontSize: 11,
                     ),
                   ),
+                  if (maintenance.warrantyExpiryApproved)
+                    _WarrantyExpiredMiniStamp(maintenance: maintenance),
                 ],
               ),
             ),
@@ -926,6 +938,8 @@ class _UnlinkedMaintenanceCard extends StatelessWidget {
                         fontSize: 11,
                       ),
                     ),
+                    if (maintenance.warrantyExpiryApproved)
+                      _WarrantyExpiredMiniStamp(maintenance: maintenance),
                   ],
                 ),
               ),
@@ -1021,6 +1035,8 @@ class _MaintenancesTab extends StatelessWidget {
                             color: AppColors.lightTextSecondary,
                           ),
                         ),
+                        if (m.warrantyExpiryApproved)
+                          _WarrantyExpiredMiniStamp(maintenance: m),
                       ],
                     ),
                   ),
@@ -1038,6 +1054,34 @@ class _MaintenancesTab extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _WarrantyExpiredMiniStamp extends StatelessWidget {
+  final MaintenanceModel maintenance;
+  const _WarrantyExpiredMiniStamp({required this.maintenance});
+
+  @override
+  Widget build(BuildContext context) {
+    String fmt(int? ms) {
+      if (ms == null) return 'غير محدد';
+      final date = DateTime.fromMillisecondsSinceEpoch(ms);
+      return '${date.day}/${date.month}/${date.year}';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Text(
+        'انتهى الضمان - النهاية: ${fmt(maintenance.warrantyEnd)} - الاعتماد: ${fmt(maintenance.warrantyExpiryApprovedAt)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.cairo(
+          color: AppColors.error,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }

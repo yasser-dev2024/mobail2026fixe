@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/settings_service.dart';
@@ -58,7 +59,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _photoImagesPerPageCtrl = TextEditingController();
   List<String> _deviceReceivers = [];
   bool _autoBackup = false;
-  bool _autoWhatsappSend = false;
   bool _invoiceResetYearly = true;
   bool _invoiceIncludeIntakePhotos = true;
   bool _invoiceShowSignature = true;
@@ -159,7 +159,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _photoImagesPerPageCtrl.text =
           _service.photoReportImagesPerPage.toString();
       _autoBackup = _service.autoBackup;
-      _autoWhatsappSend = _service.autoWhatsappSend;
       _invoiceResetYearly = _service.invoiceResetYearly;
       _invoiceIncludeIntakePhotos = _service.invoiceIncludeIntakePhotos;
       _invoiceShowSignature = _service.invoiceShowSignature;
@@ -236,7 +235,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'auto_backup': _autoBackup ? 'true' : 'false',
       'auto_backup_interval':
           AppConstants.automaticBackupIntervalDays.toString(),
-      'auto_whatsapp_send': _autoWhatsappSend ? 'true' : 'false',
       'shop_setup_completed': 'true',
     });
     if (!mounted) return;
@@ -475,6 +473,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           _buildDeviceReceiverSettings(),
           const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => context.go('/settings/alert-sounds'),
+            icon: const Icon(Icons.volume_up_rounded),
+            label: const Text('إعدادات صوت التنبيهات'),
+          ),
+          const SizedBox(height: 12),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('النسخ الاحتياطي التلقائي'),
@@ -486,15 +490,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) => setState(() => _autoBackup = value),
           ),
           const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('إرسال WhatsApp تلقائياً'),
-            subtitle: const Text(
-              'عند الإيقاف، تُجهز الرسالة ويراجعها الموظف قبل الإرسال',
-            ),
-            value: _autoWhatsappSend,
-            activeColor: AppColors.success,
-            onChanged: (value) => setState(() => _autoWhatsappSend = value),
+          OutlinedButton.icon(
+            onPressed: () => context.go('/settings/whatsapp-messages'),
+            icon: const Icon(Icons.chat_rounded),
+            label: const Text('إعدادات رسائل واتساب'),
           ),
         ],
       ),

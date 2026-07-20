@@ -366,6 +366,30 @@ class _WarrantyCard extends StatelessWidget {
                     fontSize: 13, color: colors.textSecondary),
               ),
               const SizedBox(height: 10),
+              if (warranty.expiryApproved) ...[
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.45)),
+                  ),
+                  child: Text(
+                    'انتهى الضمان - تاريخ الانتهاء: ${_dualDate(endDate)} - تاريخ الاعتماد: ${warranty.expiryApprovedAt == null ? 'غير محدد' : _dualDate(DateTime.fromMillisecondsSinceEpoch(warranty.expiryApprovedAt!))}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(
+                      color: AppColors.error,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               Wrap(
                 spacing: 8,
                 runSpacing: 8,

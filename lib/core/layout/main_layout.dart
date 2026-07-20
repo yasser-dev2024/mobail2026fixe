@@ -335,6 +335,18 @@ class _AppSideDrawer extends StatelessWidget {
                     label: 'إعدادات التطبيق والمحل',
                   ),
                   _DrawerTile(
+                    path: '/settings/alert-sounds',
+                    currentLocation: currentLocation,
+                    icon: Icons.notifications_active_rounded,
+                    label: 'إعدادات صوت التنبيهات',
+                  ),
+                  _DrawerTile(
+                    path: '/settings/whatsapp-messages',
+                    currentLocation: currentLocation,
+                    icon: Icons.chat_rounded,
+                    label: 'إعدادات رسائل واتساب',
+                  ),
+                  _DrawerTile(
                     path: '/technicians',
                     currentLocation: currentLocation,
                     icon: Icons.engineering_rounded,

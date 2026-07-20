@@ -39,11 +39,29 @@ class WhatsappRepository {
   // Templates
   // ---------------------------------------------------------------------------
 
+  /// Templates for the manual composer screen only (System B, `waTpl*`
+  /// keys) — excludes the automatic maintenance-workflow templates
+  /// (`wamsg_*` keys, System A) so the two systems' template lists stay
+  /// visually separate even though both live in the same table.
   Future<List<WhatsappTemplateModel>> getTemplates() async {
     final rows = await _db.query(
       'whatsapp_templates',
-      where: 'is_active = ?',
+      where: "is_active = ? AND key NOT LIKE '$_wamsgKeyPrefix%'",
       whereArgs: [1],
+      orderBy: 'name ASC',
+    );
+    return rows.map(WhatsappTemplateModel.fromMap).toList();
+  }
+
+  static const _wamsgKeyPrefix = 'wamsg_';
+
+  /// The 10 automatic maintenance-workflow message templates (System A),
+  /// for the WhatsApp message settings page — includes inactive ones too,
+  /// since that page is exactly where an owner re-enables them.
+  Future<List<WhatsappTemplateModel>> getAutomaticMessageTemplates() async {
+    final rows = await _db.query(
+      'whatsapp_templates',
+      where: "key LIKE '$_wamsgKeyPrefix%'",
       orderBy: 'name ASC',
     );
     return rows.map(WhatsappTemplateModel.fromMap).toList();
@@ -213,10 +231,27 @@ class WhatsappRepository {
         lower.contains('proshop.local');
   }
 
+  /// Whether the automatic pipeline (this method, [prepareDueMessages]) is
+  /// allowed to prepare/send [messageType] right now — the master switch
+  /// plus this type's own toggle from the WhatsApp message settings page.
+  /// Deliberately **not** checked inside [prepareMaintenanceMessage] or
+  /// [_buildMessage] themselves, since those are shared with the manual
+  /// "send now" bypass buttons in the repair board, which must keep working
+  /// regardless of this automatic-pipeline setting.
+  Future<bool> _isMessageTypeEnabledForAutoPipeline(String messageType) async {
+    final settings = SettingsService();
+    await settings.load();
+    if (!settings.whatsappMessageTypesMasterEnabled) return false;
+    final template = await getTemplate(_templateKeyForMessageType(messageType));
+    return template?.isActive ?? true;
+  }
+
   Future<void> prepareAndMaybeAutoSend(
     String maintenanceId,
     String messageType,
   ) async {
+    if (!await _isMessageTypeEnabledForAutoPipeline(messageType)) return;
+
     final prepared =
         await prepareMaintenanceMessage(maintenanceId, messageType);
     final settings = SettingsService();
@@ -241,9 +276,18 @@ WHERE m.shop_id = ?
   AND m.deleted_at IS NULL
 ''', [shopId, AppConstants.statusReady]);
     for (final row in readyRows) {
-      await ensureCurrentMaintenanceMessage(row['id'] as String);
+      final maintenanceId = row['id'] as String;
+      final data = await _loadMaintenanceMessageData(maintenanceId);
+      final type = data == null ? null : await _messageTypeForStatus(data);
+      if (type == null) continue;
+      if (!await _isMessageTypeEnabledForAutoPipeline(type)) continue;
+      await ensureCurrentMaintenanceMessage(maintenanceId);
     }
 
+    if (!await _isMessageTypeEnabledForAutoPipeline(
+        AppConstants.waMsgWarrantyExpiring)) {
+      return;
+    }
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final sevenDaysLater = today.add(const Duration(days: 7));
@@ -501,10 +545,12 @@ SELECT m.*,
        c.phone AS customer_phone,
        w.start_date AS warranty_start_date,
        w.end_date AS warranty_end_date,
-       w.warranty_days AS warranty_days_value
+       w.warranty_days AS warranty_days_value,
+       t.name AS technician_name
 FROM maintenance m
 LEFT JOIN customers c ON m.customer_id = c.id AND c.shop_id = m.shop_id
 LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id AND w.is_void = 0
+LEFT JOIN users t ON t.id = m.technician_id
 WHERE m.shop_id = ?
   AND m.id = ?
   AND m.deleted_at IS NULL
@@ -593,6 +639,13 @@ LIMIT 1
     return _int(rows.first['changed_at']);
   }
 
+  /// Maps a `waMsg*` message type to its `wamsg_*` template key. Distinct
+  /// from the raw `waMsg*`/`waTpl*` constant strings themselves, some of
+  /// which collide (e.g. both `waMsgReady` and the manual-composer's
+  /// `waTplReady` are `'ready'`).
+  static String _templateKeyForMessageType(String messageType) =>
+      '$_wamsgKeyPrefix$messageType';
+
   Future<String> _buildMessage(
     Map<String, dynamic> data,
     String messageType,
@@ -615,6 +668,42 @@ LIMIT 1
         _int(data['updated_at']) ??
         DateTime.now().millisecondsSinceEpoch;
     final requiredPart = await _requiredPart(_text(data['id']));
+
+    // A shop owner can customize any of the 10 automatic message types from
+    // the WhatsApp message settings page. Templates are seeded with empty
+    // text and `is_active: 1`, so this only changes behavior once an owner
+    // explicitly writes and saves their own wording — otherwise it falls
+    // straight through to the exact hardcoded switch below, unchanged.
+    final customTemplate =
+        await getTemplate(_templateKeyForMessageType(messageType));
+    if (customTemplate != null &&
+        customTemplate.isActive &&
+        customTemplate.template.trim().isNotEmpty) {
+      final unrepairableReason = messageType == AppConstants.waMsgUnrepairable
+          ? await _unrepairableReason(_text(data['id']), data)
+          : '';
+      final variables = <String, String>{
+        'اسم العميل': name,
+        'نوع الجهاز': device,
+        'رقم الجهاز': _fallback(_text(data['imei']), 'غير محدد'),
+        'رقم أمر الصيانة': ticket,
+        'اسم الفني': _fallback(_text(data['technician_name']), 'غير محدد'),
+        'تاريخ الاستلام': _date(_int(data['received_at'])),
+        'تاريخ التسليم': _date(_int(data['delivered_at'])),
+        'مدة الضمان': warrantyDays,
+        'رابط التتبع': trackingUrl,
+        'الصيانة التي تمت': repairDetails,
+        'التكلفة': cost,
+        'القطعة المطلوبة': _fallback(requiredPart, 'غير محددة'),
+        'سبب تعذر الإصلاح': unrepairableReason,
+        'بداية الضمان': _date(warrantyStart),
+        'تاريخ انتهاء الضمان': _date(warrantyEnd),
+        'تاريخ جاهزية الجهاز': _date(readyAt),
+        'المشكلة المسجلة':
+            _fallback(_text(data['fault_description']), 'غير محددة'),
+      };
+      return customTemplate.buildMessage(variables);
+    }
 
     switch (messageType) {
       case AppConstants.waMsgReceived:

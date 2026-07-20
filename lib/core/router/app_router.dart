@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
@@ -32,6 +33,8 @@ import '../../features/search/presentation/screens/search_screen.dart';
 import '../../features/backup/presentation/screens/backup_screen.dart';
 import '../../features/settings/presentation/screens/shop_setup_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/alert_sound_settings_screen.dart';
+import '../../features/whatsapp/presentation/screens/whatsapp_message_settings_screen.dart';
 import '../../features/technicians/presentation/screens/technicians_screen.dart';
 import '../../features/media/presentation/screens/media_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
@@ -41,7 +44,14 @@ import '../../features/tracking/presentation/screens/tracking_screen.dart';
 import '../layout/main_layout.dart';
 
 class AppRouter {
+  /// Exposes the router's navigator so services with no `BuildContext` of
+  /// their own (e.g. [AlertMonitorService]) can still show a dialog on top
+  /// of whichever screen is currently visible.
+  static final GlobalKey<NavigatorState> rootNavigatorKey =
+      GlobalKey<NavigatorState>();
+
   static final GoRouter router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     routes: [
       GoRoute(
@@ -241,6 +251,14 @@ class AppRouter {
           GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/alert-sounds',
+            builder: (context, state) => const AlertSoundSettingsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/whatsapp-messages',
+            builder: (context, state) => const WhatsappMessageSettingsScreen(),
           ),
           GoRoute(
             path: '/technicians',

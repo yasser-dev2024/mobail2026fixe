@@ -57,10 +57,14 @@ class MaintenanceRepository {
     final where = conditions.join(' AND ');
 
     final rows = await _db.rawQuery('''
-SELECT m.*, c.name AS customer_name, c.phone AS customer_phone, u.name AS technician_name
+SELECT m.*, c.name AS customer_name, c.phone AS customer_phone, u.name AS technician_name,
+       w.expiry_approved AS warranty_expiry_approved,
+       w.expiry_approved_at AS warranty_expiry_approved_at,
+       w.expiry_approved_by AS warranty_expiry_approved_by
 FROM maintenance m
 LEFT JOIN customers c ON m.customer_id = c.id AND c.shop_id = m.shop_id
 LEFT JOIN users u ON m.technician_id = u.id
+LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id
 WHERE $where
 ORDER BY m.created_at DESC
 ''', args.isEmpty ? null : args);
@@ -75,10 +79,14 @@ ORDER BY m.created_at DESC
   Future<MaintenanceModel?> getById(String id) async {
     final shopId = await _db.getCurrentShopId();
     final rows = await _db.rawQuery('''
-SELECT m.*, c.name AS customer_name, c.phone AS customer_phone, u.name AS technician_name
+SELECT m.*, c.name AS customer_name, c.phone AS customer_phone, u.name AS technician_name,
+       w.expiry_approved AS warranty_expiry_approved,
+       w.expiry_approved_at AS warranty_expiry_approved_at,
+       w.expiry_approved_by AS warranty_expiry_approved_by
 FROM maintenance m
 LEFT JOIN customers c ON m.customer_id = c.id AND c.shop_id = m.shop_id
 LEFT JOIN users u ON m.technician_id = u.id
+LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id
 WHERE m.shop_id = ? AND m.id = ? AND m.deleted_at IS NULL
 LIMIT 1
 ''', [shopId, id]);
@@ -89,10 +97,14 @@ LIMIT 1
   Future<List<MaintenanceModel>> getByCustomer(String customerId) async {
     final shopId = await _db.getCurrentShopId();
     final rows = await _db.rawQuery('''
-SELECT m.*, c.name AS customer_name, c.phone AS customer_phone, u.name AS technician_name
+SELECT m.*, c.name AS customer_name, c.phone AS customer_phone, u.name AS technician_name,
+       w.expiry_approved AS warranty_expiry_approved,
+       w.expiry_approved_at AS warranty_expiry_approved_at,
+       w.expiry_approved_by AS warranty_expiry_approved_by
 FROM maintenance m
 LEFT JOIN customers c ON m.customer_id = c.id AND c.shop_id = m.shop_id
 LEFT JOIN users u ON m.technician_id = u.id
+LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id
 WHERE m.shop_id = ? AND m.customer_id = ? AND m.deleted_at IS NULL
 ORDER BY m.created_at DESC
 ''', [shopId, customerId]);
@@ -703,13 +715,28 @@ LIMIT 1
     }
 
     final existing = await _db.rawQuery(
-      'SELECT id, created_at FROM warranties WHERE shop_id = ? AND maintenance_id = ? LIMIT 1',
+      '''
+      SELECT id, created_at, end_date, alert_disabled, alert_disabled_reason,
+             alert_disabled_at, alert_disabled_by, expiry_approved,
+             expiry_approved_at, expiry_approved_by
+      FROM warranties
+      WHERE shop_id = ? AND maintenance_id = ?
+      LIMIT 1
+      ''',
       [shopId, maintenance.id],
     );
     final id =
         existing.isEmpty ? const Uuid().v4() : existing.first['id'] as String;
     final createdAt =
         existing.isEmpty ? now : existing.first['created_at'] as int? ?? now;
+    final existingEnd =
+        existing.isEmpty ? null : existing.first['end_date'] as int?;
+    final preserveAlertDisabled = existing.isNotEmpty &&
+        (existing.first['alert_disabled'] as int? ?? 0) == 1 &&
+        existingEnd == maintenance.warrantyEnd;
+    final preserveExpiryApproved = existing.isNotEmpty &&
+        (existing.first['expiry_approved'] as int? ?? 0) == 1 &&
+        existingEnd == maintenance.warrantyEnd;
     final deviceInfo = [
       maintenance.brand,
       maintenance.model,
@@ -728,13 +755,40 @@ LIMIT 1
       'start_date': maintenance.warrantyStart,
       'end_date': maintenance.warrantyEnd,
       'notes': maintenance.notes,
-      'is_void': 0,
+      'is_void': preserveExpiryApproved ? 1 : 0,
+      'alert_disabled': preserveAlertDisabled ? 1 : 0,
+      'alert_disabled_reason': preserveAlertDisabled
+          ? existing.first['alert_disabled_reason']
+          : null,
+      'alert_disabled_at':
+          preserveAlertDisabled ? existing.first['alert_disabled_at'] : null,
+      'alert_disabled_by':
+          preserveAlertDisabled ? existing.first['alert_disabled_by'] : null,
+      'expiry_approved': preserveExpiryApproved ? 1 : 0,
+      'expiry_approved_at':
+          preserveExpiryApproved ? existing.first['expiry_approved_at'] : null,
+      'expiry_approved_by':
+          preserveExpiryApproved ? existing.first['expiry_approved_by'] : null,
       'created_at': createdAt,
       'updated_at': now,
     };
 
     if (existing.isEmpty) {
       await _db.insert('warranties', data);
+      final user = AuthRepository().getCurrentUser();
+      await _db.insert('warranty_actions', {
+        'id': const Uuid().v4(),
+        'shop_id': shopId,
+        'warranty_id': id,
+        'maintenance_id': maintenance.id,
+        'action': 'created',
+        'old_value': null,
+        'new_value': '${maintenance.warrantyDays ?? 0} يوم',
+        'user_id': user?.id,
+        'username': user?.username ?? user?.name ?? 'النظام',
+        'notes': null,
+        'created_at': now,
+      });
     } else {
       await _db.update('warranties', data, id);
     }

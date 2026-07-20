@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../warranty/presentation/widgets/warranty_alert_action_dialog.dart';
 import '../../data/notification_model.dart';
 import '../cubit/notifications_cubit.dart';
 import '../cubit/notifications_state.dart';
@@ -183,8 +184,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return const SizedBox.shrink();
   }
 
-  void _handleTap(BuildContext context, NotificationModel notif) {
-    context.read<NotificationsCubit>().markAsRead(notif.id);
+  Future<void> _handleTap(BuildContext context, NotificationModel notif) async {
+    final notificationsCubit = context.read<NotificationsCubit>();
+    await notificationsCubit.markAsRead(notif.id);
+    if (!context.mounted) return;
+    if (_isWarrantyAlert(notif) && notif.referenceId != null) {
+      final changed = await showWarrantyAlertActionDialog(
+        context,
+        warrantyId: notif.referenceId!,
+      );
+      if (!context.mounted) return;
+      if (changed == true) {
+        await notificationsCubit.generateSmartNotifications();
+      } else {
+        await notificationsCubit.loadNotifications();
+      }
+      return;
+    }
     if (notif.referenceId != null) {
       switch (notif.referenceType) {
         case 'maintenance':
@@ -209,6 +225,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           break;
       }
     }
+  }
+
+  bool _isWarrantyAlert(NotificationModel notif) {
+    return notif.referenceType == 'warranty' ||
+        notif.type.startsWith('warranty_');
   }
 
   Widget _buildEmptyState(AppColorsExtension colors) {

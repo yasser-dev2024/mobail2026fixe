@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/router/app_router.dart';
+import 'core/services/alert_monitor_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_cubit.dart';
 import 'core/utils/platform_utils.dart';
@@ -25,6 +26,7 @@ void main() async {
 
   final themeCubit = ThemeCubit();
   await themeCubit.loadTheme();
+  AlertMonitorService().start();
 
   runApp(ProShopApp(themeCubit: themeCubit));
 }
@@ -39,7 +41,7 @@ class ProShopApp extends StatelessWidget {
       providers: [
         BlocProvider<ThemeCubit>.value(value: themeCubit),
         BlocProvider<NotificationsCubit>(
-          create: (_) => NotificationsCubit()..loadNotifications(),
+          create: (_) => NotificationsCubit()..generateSmartNotifications(),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(

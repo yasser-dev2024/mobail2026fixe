@@ -47,6 +47,10 @@ class DeviceReportPdfService {
       fontWeight: pw.FontWeight.bold,
       color: PdfColors.blueGrey800,
     );
+    final warrantyExpiryApproved =
+        PdfArabicUtils.integer(maintenance['warranty_expiry_approved']) == 1;
+    final warrantyExpiryApprovedAt =
+        PdfArabicUtils.integer(maintenance['warranty_expiry_approved_at']);
 
     final doc = pw.Document();
     doc.addPage(
@@ -124,6 +128,15 @@ class DeviceReportPdfService {
                       body,
                       bold,
                     ),
+                    if (warrantyExpiryApproved) ...[
+                      pw.SizedBox(height: 6),
+                      _expiredWarrantyStamp(
+                        body,
+                        warrantyEnd:
+                            PdfArabicUtils.integer(maintenance['warranty_end']),
+                        approvedAt: warrantyExpiryApprovedAt,
+                      ),
+                    ],
                   ],
                 ),
                 pw.SizedBox(height: 8),
@@ -360,6 +373,38 @@ class DeviceReportPdfService {
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
       ),
       child: pw.Text(text, style: style),
+    );
+  }
+
+  pw.Widget _expiredWarrantyStamp(
+    pw.TextStyle style, {
+    required int? warrantyEnd,
+    required int? approvedAt,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.red50,
+        border: pw.Border.all(color: PdfColors.red300, width: 0.8),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'انتهى الضمان',
+            style: style.copyWith(
+              color: PdfColors.red800,
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+          pw.Text(
+            'تاريخ انتهاء الضمان: ${PdfArabicUtils.date(warrantyEnd)} | تاريخ اعتماد الانتهاء: ${PdfArabicUtils.date(approvedAt)}',
+            style: style.copyWith(color: PdfColors.red800),
+          ),
+        ],
+      ),
     );
   }
 

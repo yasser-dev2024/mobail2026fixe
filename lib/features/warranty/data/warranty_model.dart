@@ -13,6 +13,13 @@ class WarrantyModel {
   final int endDate;
   final String? notes;
   final bool isVoid;
+  final bool alertDisabled;
+  final String? alertDisabledReason;
+  final int? alertDisabledAt;
+  final String? alertDisabledBy;
+  final bool expiryApproved;
+  final int? expiryApprovedAt;
+  final String? expiryApprovedBy;
   final int createdAt;
   final int updatedAt;
 
@@ -31,6 +38,13 @@ class WarrantyModel {
     required this.endDate,
     this.notes,
     required this.isVoid,
+    this.alertDisabled = false,
+    this.alertDisabledReason,
+    this.alertDisabledAt,
+    this.alertDisabledBy,
+    this.expiryApproved = false,
+    this.expiryApprovedAt,
+    this.expiryApprovedBy,
     required this.createdAt,
     required this.updatedAt,
     this.customerName,
@@ -59,6 +73,8 @@ class WarrantyModel {
       endDate: endDate,
       notes: notes,
       isVoid: false,
+      alertDisabled: false,
+      expiryApproved: false,
       createdAt: now,
       updatedAt: now,
       customerName: null,
@@ -78,6 +94,13 @@ class WarrantyModel {
       endDate: map['end_date'] as int,
       notes: map['notes'] as String?,
       isVoid: (map['is_void'] as int) == 1,
+      alertDisabled: (map['alert_disabled'] as int? ?? 0) == 1,
+      alertDisabledReason: map['alert_disabled_reason'] as String?,
+      alertDisabledAt: map['alert_disabled_at'] as int?,
+      alertDisabledBy: map['alert_disabled_by'] as String?,
+      expiryApproved: (map['expiry_approved'] as int? ?? 0) == 1,
+      expiryApprovedAt: map['expiry_approved_at'] as int?,
+      expiryApprovedBy: map['expiry_approved_by'] as String?,
       createdAt: map['created_at'] as int,
       updatedAt: map['updated_at'] as int,
       customerName: map['customer_name'] as String?,
@@ -97,6 +120,13 @@ class WarrantyModel {
       'end_date': endDate,
       'notes': notes,
       'is_void': isVoid ? 1 : 0,
+      'alert_disabled': alertDisabled ? 1 : 0,
+      'alert_disabled_reason': alertDisabledReason,
+      'alert_disabled_at': alertDisabledAt,
+      'alert_disabled_by': alertDisabledBy,
+      'expiry_approved': expiryApproved ? 1 : 0,
+      'expiry_approved_at': expiryApprovedAt,
+      'expiry_approved_by': expiryApprovedBy,
       'created_at': createdAt,
       'updated_at': updatedAt,
     };
@@ -113,6 +143,13 @@ class WarrantyModel {
     int? endDate,
     Object? notes = _sentinel,
     bool? isVoid,
+    bool? alertDisabled,
+    Object? alertDisabledReason = _sentinel,
+    Object? alertDisabledAt = _sentinel,
+    Object? alertDisabledBy = _sentinel,
+    bool? expiryApproved,
+    Object? expiryApprovedAt = _sentinel,
+    Object? expiryApprovedBy = _sentinel,
     int? createdAt,
     int? updatedAt,
     Object? customerName = _sentinel,
@@ -129,6 +166,23 @@ class WarrantyModel {
       endDate: endDate ?? this.endDate,
       notes: notes == _sentinel ? this.notes : notes as String?,
       isVoid: isVoid ?? this.isVoid,
+      alertDisabled: alertDisabled ?? this.alertDisabled,
+      alertDisabledReason: alertDisabledReason == _sentinel
+          ? this.alertDisabledReason
+          : alertDisabledReason as String?,
+      alertDisabledAt: alertDisabledAt == _sentinel
+          ? this.alertDisabledAt
+          : alertDisabledAt as int?,
+      alertDisabledBy: alertDisabledBy == _sentinel
+          ? this.alertDisabledBy
+          : alertDisabledBy as String?,
+      expiryApproved: expiryApproved ?? this.expiryApproved,
+      expiryApprovedAt: expiryApprovedAt == _sentinel
+          ? this.expiryApprovedAt
+          : expiryApprovedAt as int?,
+      expiryApprovedBy: expiryApprovedBy == _sentinel
+          ? this.expiryApprovedBy
+          : expiryApprovedBy as String?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       customerName: customerName == _sentinel
@@ -141,6 +195,7 @@ class WarrantyModel {
   }
 
   String get status {
+    if (expiryApproved) return 'expired_approved';
     if (isVoid) return 'expired';
     final days = calendarDaysRemaining;
     if (days < 0) return 'expired';
@@ -164,6 +219,8 @@ class WarrantyModel {
   bool get isLongWarranty =>
       warrantyDays > AppConstants.longWarrantyThresholdDays;
 
+  bool get hasExpiredStamp => expiryApproved;
+
   String get statusLabel {
     switch (status) {
       case 'active':
@@ -172,6 +229,8 @@ class WarrantyModel {
         return 'ينتهي قريباً';
       case 'expired':
         return 'منتهي';
+      case 'expired_approved':
+        return 'منتهي ومعتمد';
       default:
         return 'غير محدد';
     }
@@ -185,6 +244,8 @@ class WarrantyModel {
         return Colors.orange;
       case 'expired':
         return Colors.red;
+      case 'expired_approved':
+        return Colors.redAccent;
       default:
         return Colors.grey;
     }

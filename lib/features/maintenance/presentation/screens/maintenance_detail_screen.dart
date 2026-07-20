@@ -20,6 +20,7 @@ import '../../../notifications/presentation/cubit/notifications_cubit.dart';
 import '../../../whatsapp/data/whatsapp_message_model.dart';
 import '../../../whatsapp/data/whatsapp_repository.dart';
 import '../../../warranty/data/warranty_claim_model.dart';
+import '../../../warranty/data/warranty_action_model.dart';
 import '../../../warranty/data/warranty_repository.dart';
 import '../../../invoices/data/invoice_model.dart';
 import '../../../invoices/data/invoice_repository.dart';
@@ -59,6 +60,7 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen>
   Map<String, dynamic>? _approval;
   InvoiceModel? _latestInvoice;
   DeviceReportModel? _latestReport;
+  WarrantyAlertDetails? _warrantyDetails;
   String? _customerPhone;
   bool _loadingWhatsapp = false;
   bool _documentBusy = false;
@@ -109,6 +111,13 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
           await InvoiceRepository().getByMaintenance(widget.maintenanceId);
       final reports = await DeviceReportRepository()
           .getForMaintenance(widget.maintenanceId);
+      final warrantyRepo = WarrantyRepository();
+      await warrantyRepo.syncFromMaintenance();
+      final warranty =
+          await warrantyRepo.getByMaintenance(widget.maintenanceId);
+      final warrantyDetails = warranty == null
+          ? null
+          : await warrantyRepo.getAlertDetails(warranty.id);
       if (!mounted) return;
       setState(() {
         _statusHistory = history;
@@ -117,6 +126,7 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
         _approval = approval;
         _latestInvoice = invoice;
         _latestReport = reports.isEmpty ? null : reports.first;
+        _warrantyDetails = warrantyDetails;
       });
     } catch (_) {}
   }
@@ -618,7 +628,16 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                   m.warrantyType != AppConstants.warrantyNone) ...[
                 _SectionCard(
                   title: 'معلومات الضمان',
+                  trailing: _warrantyDetails == null
+                      ? null
+                      : TextButton.icon(
+                          onPressed: _addWarrantyCorrectionNote,
+                          icon: const Icon(Icons.note_add_rounded, size: 16),
+                          label: Text('ملاحظة تصحيحية',
+                              style: GoogleFonts.cairo(fontSize: 12)),
+                        ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _InfoRow(
                           icon: Icons.verified_user_rounded,
@@ -644,6 +663,14 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
                             icon: Icons.hourglass_bottom_rounded,
                             label: 'المتبقي',
                             value: _remainingWarranty(m.warrantyEnd!)),
+                      if (m.warrantyExpiryApproved) ...[
+                        const SizedBox(height: 10),
+                        _buildWarrantyExpiredStamp(m),
+                      ],
+                      if ((_warrantyDetails?.actions ?? []).isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildWarrantyActionLog(_warrantyDetails!.actions),
+                      ],
                     ],
                   ),
                 ),
@@ -1088,6 +1115,166 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
         return 'مخصص';
       default:
         return 'بدون ضمان';
+    }
+  }
+
+  Widget _buildWarrantyExpiredStamp(MaintenanceModel m) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.gpp_bad_rounded, color: AppColors.error),
+              const SizedBox(width: 8),
+              Text(
+                'انتهى الضمان',
+                style: GoogleFonts.cairo(
+                  color: AppColors.error,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'تاريخ انتهاء الضمان: ${m.warrantyEnd == null ? 'غير محدد' : _dualDate(m.warrantyEnd!)}',
+            style: GoogleFonts.cairo(
+              color: AppColors.error,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            'تاريخ اعتماد الانتهاء: ${m.warrantyExpiryApprovedAt == null ? 'غير محدد' : _dualDate(m.warrantyExpiryApprovedAt!)}',
+            style: GoogleFonts.cairo(
+              color: AppColors.error,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWarrantyActionLog(List<WarrantyActionModel> actions) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'سجل إجراءات الضمان',
+          style: GoogleFonts.cairo(
+            fontWeight: FontWeight.w800,
+            color: context.appColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        ...actions.map(_buildWarrantyActionRow),
+      ],
+    );
+  }
+
+  Widget _buildWarrantyActionRow(WarrantyActionModel action) {
+    final colors = context.appColors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(top: 8),
+            decoration: const BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  action.actionLabel,
+                  style: GoogleFonts.cairo(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                Text(
+                  [
+                    action.username ?? 'النظام',
+                    _fmt(action.createdAt),
+                    if ((action.notes ?? '').trim().isNotEmpty) action.notes!,
+                    if ((action.oldValue ?? '').trim().isNotEmpty)
+                      'السابق: ${action.oldValue}',
+                    if ((action.newValue ?? '').trim().isNotEmpty)
+                      'الجديد: ${action.newValue}',
+                  ].join(' - '),
+                  style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    color: colors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addWarrantyCorrectionNote() async {
+    final details = _warrantyDetails;
+    if (details == null) return;
+    final ctrl = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('ملاحظة تصحيحية',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.w800)),
+        content: TextField(
+          controller: ctrl,
+          textDirection: TextDirection.rtl,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'اكتب الملاحظة دون تعديل الإجراءات السابقة',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('إلغاء', style: GoogleFonts.cairo()),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.save_rounded),
+            label: Text('حفظ', style: GoogleFonts.cairo()),
+          ),
+        ],
+      ),
+    );
+    final note = ctrl.text.trim();
+    ctrl.dispose();
+    if (saved != true || note.isEmpty) return;
+    try {
+      await WarrantyRepository().addCorrectionNote(details.warranty.id, note);
+      await _loadWorkflowExtensions();
+      _showMessage('تمت إضافة الملاحظة التصحيحية');
+    } catch (e) {
+      _showMessage('$e', error: true);
     }
   }
 
@@ -1564,7 +1751,7 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
 
   Future<void> _reloadMaintenanceAfterAction() async {
     if (!mounted) return;
-    context.read<NotificationsCubit>().loadNotifications();
+    context.read<NotificationsCubit>().generateSmartNotifications();
     context.read<MaintenanceCubit>().loadById(widget.maintenanceId);
     await _loadWorkflowExtensions();
     await _loadWhatsappMessages();

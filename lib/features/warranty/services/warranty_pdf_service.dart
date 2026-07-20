@@ -95,10 +95,13 @@ SELECT m.*,
        w.start_date AS warranty_start_date,
        w.end_date AS warranty_end_date,
        w.warranty_days AS warranty_days_value,
-       w.notes AS warranty_notes
+       w.notes AS warranty_notes,
+       w.expiry_approved AS warranty_expiry_approved,
+       w.expiry_approved_at AS warranty_expiry_approved_at,
+       w.expiry_approved_by AS warranty_expiry_approved_by
 FROM maintenance m
 LEFT JOIN customers c ON m.customer_id = c.id AND c.shop_id = m.shop_id
-LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id AND w.is_void = 0
+LEFT JOIN warranties w ON w.maintenance_id = m.id AND w.shop_id = m.shop_id
 WHERE m.shop_id = ?
   AND m.id = ?
   AND m.deleted_at IS NULL
@@ -162,6 +165,8 @@ ORDER BY p.created_at ASC
         _int(data['warranty_end_date']) ?? _int(data['warranty_end']);
     final warrantyDays =
         _int(data['warranty_days_value']) ?? _int(data['warranty_days']) ?? 0;
+    final warrantyExpiryApproved = _int(data['warranty_expiry_approved']) == 1;
+    final warrantyExpiryApprovedAt = _int(data['warranty_expiry_approved_at']);
     final device =
         '${_text(data['brand'], 'جهاز')} ${_text(data['model'])}'.trim();
 
@@ -289,6 +294,14 @@ ORDER BY p.created_at ASC
                       body,
                       bold,
                     ),
+                    if (warrantyExpiryApproved) ...[
+                      pw.SizedBox(height: 6),
+                      _expiredWarrantyStamp(
+                        body,
+                        warrantyEnd: warrantyEnd,
+                        approvedAt: warrantyExpiryApprovedAt,
+                      ),
+                    ],
                   ],
                 ),
                 pw.SizedBox(height: 8),
@@ -445,6 +458,38 @@ ORDER BY p.created_at ASC
           pw.Text(title, style: titleStyle),
           pw.SizedBox(height: 6),
           ...children,
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _expiredWarrantyStamp(
+    pw.TextStyle style, {
+    required int? warrantyEnd,
+    required int? approvedAt,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.red50,
+        border: pw.Border.all(color: PdfColors.red300),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'انتهى الضمان',
+            style: style.copyWith(
+              color: PdfColors.red800,
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+          pw.Text(
+            'تاريخ انتهاء الضمان: ${_date(warrantyEnd)} | تاريخ اعتماد الانتهاء: ${_date(approvedAt)}',
+            style: style.copyWith(color: PdfColors.red800),
+          ),
         ],
       ),
     );
