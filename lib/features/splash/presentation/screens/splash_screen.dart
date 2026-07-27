@@ -235,7 +235,7 @@ class _SplashScreenState extends State<SplashScreen>
       await _updateProgress(
         0.80,
         'تفعيل التنبيه في موعده...',
-        'فعّل «المنبهات والتذكيرات» لـ ProShop ثم ارجع إلى التطبيق.',
+        'فعّل «المنبهات والتذكيرات» لـ مساعد الصيانة ثم ارجع إلى التطبيق.',
       );
       await _openExternalSettings(service.openExactAlarmSettings);
       status = await service.permissionStatus();
@@ -245,7 +245,7 @@ class _SplashScreenState extends State<SplashScreen>
       await _updateProgress(
         0.82,
         'تفعيل التشغيل التلقائي...',
-        'في الشاشة التالية فعّل ProShop ليعمل التنبيه بعد إغلاق التطبيق، ثم ارجع.',
+        'في الشاشة التالية فعّل مساعد الصيانة ليعمل التنبيه بعد إغلاق التطبيق، ثم ارجع.',
       );
       await _openExternalSettings(service.openAutoStartSettings);
       status = await service.permissionStatus();
@@ -255,7 +255,7 @@ class _SplashScreenState extends State<SplashScreen>
       await _updateProgress(
         0.84,
         'السماح بالعمل في الخلفية...',
-        'اختر السماح حتى لا يوقف النظام تنبيهات ProShop عند إغلاق التطبيق.',
+        'اختر السماح حتى لا يوقف النظام تنبيهات مساعد الصيانة عند إغلاق التطبيق.',
       );
       await _openExternalSettings(
         service.requestBatteryOptimizationExemption,
@@ -539,7 +539,7 @@ class _BrandHeader extends StatelessWidget {
     return Column(
       children: [
         Text(
-          'ProShop',
+          'مساعد الصيانة',
           textAlign: TextAlign.center,
           style: GoogleFonts.cairo(
             color: Colors.white,
@@ -699,7 +699,7 @@ class _BackgroundPermissionsDialog extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'تشغيل جميع خصائص ProShop',
+                'تشغيل جميع خصائص مساعد الصيانة',
                 style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
               ),
             ),
@@ -741,7 +741,7 @@ class _BackgroundPermissionsDialog extends StatelessWidget {
                   icon: Icons.battery_saver_rounded,
                   title: 'العمل في الخلفية',
                   reason:
-                      'لمنع توفير البطارية من إيقاف تنبيهات ProShop والتطبيق مغلق.',
+                      'لمنع توفير البطارية من إيقاف تنبيهات مساعد الصيانة والتطبيق مغلق.',
                 ),
                 const _BackgroundPermissionRow(
                   icon: Icons.photo_camera_rounded,
@@ -751,7 +751,7 @@ class _BackgroundPermissionsDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'ستفتح إعدادات الجهاز المطلوبة بالتتابع. فعّل ProShop في شاشة التشغيل التلقائي ثم ارجع لإكمال التشغيل.',
+                  'ستفتح إعدادات الجهاز المطلوبة بالتتابع. فعّل مساعد الصيانة في شاشة التشغيل التلقائي ثم ارجع لإكمال التشغيل.',
                   style: GoogleFonts.cairo(
                     color: const Color(0xFF0A7E59),
                     fontSize: 12,

@@ -21,7 +21,7 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
 
     await windowManager.ensureInitialized();
-    await windowManager.setTitle('ProShop - نظام إدارة محل الجوالات');
+    await windowManager.setTitle('مساعد الصيانة - نظام إدارة محل الجوالات');
     await windowManager.setMinimumSize(const Size(1100, 700));
     await windowManager.setSize(const Size(1400, 900));
     await windowManager.center();
@@ -53,7 +53,7 @@ class ProShopApp extends StatelessWidget {
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {
           return MaterialApp.router(
-            title: 'ProShop',
+            title: 'مساعد الصيانة',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,

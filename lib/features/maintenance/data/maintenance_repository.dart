@@ -3,8 +3,10 @@ import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/database/database_service.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../invoices/data/invoice_repository.dart';
 import '../../whatsapp/data/whatsapp_repository.dart';
 import '../../tracking/services/remote_tracking_service.dart';
+import 'maintenance_customer_notification.dart';
 import 'maintenance_model.dart';
 import 'maintenance_part_model.dart';
 import 'maintenance_image_model.dart';
@@ -142,7 +144,7 @@ ORDER BY m.created_at DESC
         .prepareAndMaybeAutoSend(id, AppConstants.waMsgReceived);
     if (normalized.status != AppConstants.statusNew) {
       await _addStatusNotification(id, normalized.status);
-      await _prepareWhatsappForStatus(id, normalized.status);
+      await _notifyCustomerForStatus(id, normalized.status);
     }
     return id;
   }
@@ -180,7 +182,7 @@ ORDER BY m.created_at DESC
       await _addStatusNotification(normalized.id, normalized.status);
     }
     if (before.status != normalized.status) {
-      await _prepareWhatsappForStatus(normalized.id, normalized.status);
+      await _notifyCustomerForStatus(normalized.id, normalized.status);
     }
   }
 
@@ -252,7 +254,7 @@ ORDER BY m.created_at DESC
       oldValue: oldStatus,
       newValue: status,
     );
-    await _prepareWhatsappForStatus(id, status);
+    await _notifyCustomerForStatus(id, status);
   }
 
   Future<void> saveRepairResult({
@@ -339,36 +341,34 @@ ORDER BY m.created_at DESC
       oldValue: before.status,
       newValue: status,
     );
-    await _prepareWhatsappForStatus(id, status);
+    await _notifyCustomerForStatus(id, status);
   }
 
-  Future<void> _prepareWhatsappForStatus(
-      String maintenanceId, String status) async {
-    String? type;
-    switch (status) {
-      case AppConstants.statusNew:
-      case AppConstants.statusWaitingInspection:
-        type = AppConstants.waMsgReceived;
-        break;
-      case AppConstants.statusRepaired:
-      case AppConstants.statusReady:
-        type = AppConstants.waMsgReady;
-        break;
-      case AppConstants.statusWaitingPart:
-        type = AppConstants.waMsgNeedsPart;
-        break;
-      case AppConstants.statusUnrepairable:
-        type = AppConstants.waMsgUnrepairable;
-        break;
-      case AppConstants.statusDelivered:
-        type = AppConstants.waMsgDelivered;
-        break;
-      case AppConstants.statusWarrantyReturn:
-        type = AppConstants.waMsgWarrantyClaim;
-        break;
+  Future<void> _notifyCustomerForStatus(
+    String maintenanceId,
+    String status,
+  ) async {
+    final plan = maintenanceCustomerNotificationForStatus(status);
+    if (plan.kind == MaintenanceCustomerNotificationKind.invoicePdf) {
+      final invoiceRepository = InvoiceRepository();
+      final invoice = await invoiceRepository.createOrRegenerateForMaintenance(
+        maintenanceId,
+      );
+      final opened = await invoiceRepository.sendWhatsApp(invoice.id);
+      if (!opened) {
+        throw Exception(
+          'تعذر فتح واتساب وإرفاق فاتورة PDF. الفاتورة محفوظة ويمكن إعادة إرسالها من قسم الفواتير.',
+        );
+      }
+      return;
     }
-    if (type == null) return;
-    await WhatsappRepository().prepareAndMaybeAutoSend(maintenanceId, type);
+
+    final messageType = plan.whatsappMessageType;
+    if (messageType == null) return;
+    await WhatsappRepository().prepareAndMaybeAutoSend(
+      maintenanceId,
+      messageType,
+    );
   }
 
   // ---------------------------------------------------------------------------

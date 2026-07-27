@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 const SizedBox(height: 20),
                                 Text(
-                                  'ProShop',
+                                  'مساعد الصيانة',
                                   style: GoogleFonts.cairo(
                                     fontSize: 32,
                                     fontWeight: FontWeight.w800,

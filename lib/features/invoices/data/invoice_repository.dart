@@ -24,11 +24,6 @@ class InvoiceRepository {
   Future<InvoiceModel> createOrRegenerateForMaintenance(
     String maintenanceId,
   ) async {
-    final existing = await getByMaintenance(maintenanceId);
-    if (existing != null && existing.status != AppConstants.invoiceCancelled) {
-      return _regeneratePdf(existing);
-    }
-
     final settings = SettingsService();
     await settings.load();
     final data = await _loadMaintenanceData(maintenanceId);
@@ -41,7 +36,6 @@ class InvoiceRepository {
       throw Exception('لا يمكن إنشاء الفاتورة دون رقم جوال العميل.');
     }
 
-    final number = await _nextInvoiceNumber(settings);
     final subtotal = PdfArabicUtils.number(data['total_cost']);
     final tax = subtotal * (settings.taxRate / 100);
     final total = subtotal + tax;
@@ -53,9 +47,53 @@ class InvoiceRepository {
     ]);
     final centerSnapshot = _settingsSnapshot(settings);
     final warrantyType = data['warranty_type']?.toString();
+    final warrantyDays = PdfArabicUtils.integer(data['warranty_days']) ?? 0;
+    final warrantyStart = PdfArabicUtils.integer(data['warranty_start']);
     final warrantyEnd = PdfArabicUtils.integer(data['warranty_end']);
     final warrantyExpiryApproved =
         (PdfArabicUtils.integer(data['warranty_expiry_approved']) ?? 0) == 1;
+    final warrantyStatus = warrantyExpiryApproved
+        ? 'expired_approved'
+        : InvoiceModel.calculateWarrantyStatus(
+            warrantyType: warrantyType,
+            warrantyEnd: warrantyEnd,
+          );
+    final customerName = PdfArabicUtils.text(data['customer_name'], 'العميل');
+    final deviceName =
+        '${PdfArabicUtils.text(data['brand'], 'جهاز')} ${PdfArabicUtils.text(data['model'])}'
+            .trim();
+    final settingsSnapshot = jsonEncode(centerSnapshot);
+
+    final existing = await getByMaintenance(maintenanceId);
+    if (existing != null && existing.status != AppConstants.invoiceCancelled) {
+      final refreshed = existing.copyWith(
+        customerId: data['customer_id'] as String,
+        deviceId: data['device_id'] as String?,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        deviceName: deviceName,
+        imei: data['imei'] as String?,
+        serialNumber: data['serial_number'] as String?,
+        subtotal: subtotal,
+        tax: tax,
+        total: total,
+        amountPaid: amountPaid,
+        amountDue: total - amountPaid,
+        warrantyType: warrantyType,
+        warrantyDays: warrantyDays,
+        warrantyStart: warrantyStart,
+        warrantyEnd: warrantyEnd,
+        warrantyStatus: warrantyStatus,
+        warrantyTermsSnapshot: warrantyTerms,
+        centerSettingsSnapshot: settingsSnapshot,
+        notes: data['fault_description'] as String?,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      await _db.update('invoices', refreshed.toMap(), refreshed.id);
+      return _regeneratePdf(refreshed);
+    }
+
+    final number = await _nextInvoiceNumber(settings);
 
     final invoice = InvoiceModel.create(
       shopId: settings.shopId,
@@ -63,11 +101,9 @@ class InvoiceRepository {
       customerId: data['customer_id'] as String,
       deviceId: data['device_id'] as String?,
       maintenanceId: maintenanceId,
-      customerName: PdfArabicUtils.text(data['customer_name'], 'العميل'),
+      customerName: customerName,
       customerPhone: customerPhone,
-      deviceName:
-          '${PdfArabicUtils.text(data['brand'], 'جهاز')} ${PdfArabicUtils.text(data['model'])}'
-              .trim(),
+      deviceName: deviceName,
       imei: data['imei'] as String?,
       serialNumber: data['serial_number'] as String?,
       subtotal: subtotal,
@@ -76,11 +112,11 @@ class InvoiceRepository {
       amountPaid: amountPaid,
       paymentMethod: AppConstants.paymentCash,
       warrantyType: warrantyType,
-      warrantyDays: PdfArabicUtils.integer(data['warranty_days']) ?? 0,
-      warrantyStart: PdfArabicUtils.integer(data['warranty_start']),
+      warrantyDays: warrantyDays,
+      warrantyStart: warrantyStart,
       warrantyEnd: warrantyEnd,
       warrantyTermsSnapshot: warrantyTerms,
-      centerSettingsSnapshot: jsonEncode(centerSnapshot),
+      centerSettingsSnapshot: settingsSnapshot,
       createdBy: AuthRepository().getCurrentUser()?.username ?? 'النظام',
       notes: data['fault_description'] as String?,
     );
@@ -88,12 +124,7 @@ class InvoiceRepository {
     final approved = invoice.copyWith(
       status: AppConstants.invoiceApproved,
       approvedAt: DateTime.now().millisecondsSinceEpoch,
-      warrantyStatus: warrantyExpiryApproved
-          ? 'expired_approved'
-          : InvoiceModel.calculateWarrantyStatus(
-              warrantyType: warrantyType,
-              warrantyEnd: warrantyEnd,
-            ),
+      warrantyStatus: warrantyStatus,
     );
 
     await _db.insert('invoices', approved.toMap());

@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -51,7 +52,7 @@ object BackgroundAlertScheduler {
     private const val LEGACY_CHANNEL_ID = "proshop_background_alerts_v1"
     private const val MAINTENANCE_CHANNEL_ID = "proshop_maintenance_alerts_v2"
     private const val WARRANTY_CHANNEL_ID = "proshop_warranty_alerts_v2"
-    private const val SILENT_CHANNEL_ID = "proshop_other_alerts_v1"
+    private const val GENERAL_CHANNEL_ID = "proshop_general_alerts_v2"
     private const val NOTIFICATION_ID = 7301
     private const val ALARM_REQUEST_CODE = 7302
     private const val PREFS_NAME = "proshop_background_alert_state"
@@ -129,8 +130,8 @@ object BackgroundAlertScheduler {
             listOf(
                 StoredBackgroundAlert(
                     id = "background-verification",
-                    type = "maintenance_overdue_verification",
-                    title = "تنبيهات ProShop تعمل خارج التطبيق",
+                    type = "general_verification",
+                    title = "تنبيهات مساعد الصيانة تعمل خارج التطبيق",
                     message =
                         "تم تشغيل هذا الإشعار من Android والتطبيق مغلق. " +
                             "ستظهر تنبيهات الصيانة والضمان بالطريقة نفسها.",
@@ -209,6 +210,8 @@ object BackgroundAlertScheduler {
         val warrantySound = Uri.parse(
             "android.resource://${context.packageName}/${R.raw.proshop_warranty_alert}",
         )
+        val generalSound =
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
         manager.createNotificationChannel(
             NotificationChannel(
@@ -236,13 +239,14 @@ object BackgroundAlertScheduler {
         )
         manager.createNotificationChannel(
             NotificationChannel(
-                SILENT_CHANNEL_ID,
-                "تنبيهات أخرى",
-                NotificationManager.IMPORTANCE_DEFAULT,
+                GENERAL_CHANNEL_ID,
+                "تنبيهات مساعد الصيانة العامة",
+                NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "تنبيهات التطبيق الأخرى دون استخدام صوتي الصيانة والضمان"
-                setSound(null, null)
-                enableVibration(false)
+                description = "تنبيهات الحالات والمخزون وبقية أحداث مساعد الصيانة"
+                setSound(generalSound, audioAttributes)
+                enableVibration(true)
+                enableLights(true)
                 setShowBadge(true)
             },
         )
@@ -442,7 +446,7 @@ object BackgroundAlertScheduler {
                         if (alerts.size > 6) {
                             style.addLine("و${alerts.size - 6} تنبيهات أخرى")
                         }
-                        style.setSummaryText("ProShop")
+                        style.setSummaryText("مساعد الصيانة")
                     }
                 },
             )
@@ -477,7 +481,7 @@ object BackgroundAlertScheduler {
         if (alerts.any { it.type.startsWith("warranty_") }) {
             return WARRANTY_CHANNEL_ID
         }
-        return SILENT_CHANNEL_ID
+        return GENERAL_CHANNEL_ID
     }
 
     private fun markFired(

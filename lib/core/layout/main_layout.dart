@@ -407,7 +407,7 @@ class _DrawerHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ProShop',
+                  'مساعد الصيانة',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.cairo(
