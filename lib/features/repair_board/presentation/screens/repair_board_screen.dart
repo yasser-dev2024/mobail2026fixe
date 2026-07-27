@@ -1350,28 +1350,31 @@ class _CustomerDevicesDialog extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: GridView.builder(
-                padding: EdgeInsets.zero,
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 430,
-                  mainAxisExtent: 430,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                ),
-                itemCount: group.cards.length,
-                itemBuilder: (context, index) {
-                  final card = group.cards[index];
-                  return _MotionIn(
-                    delay: Duration(
-                      milliseconds: 45 * (index > 8 ? 8 : index),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns =
+                      constraints.maxWidth >= 760 && group.cards.length > 1
+                          ? 2
+                          : 1;
+                  return GridView.builder(
+                    padding: EdgeInsets.zero,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisExtent: 430,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
                     ),
-                    child: _RepairCard(
-                      card: card,
-                      onPressed: () => onOpen(card),
-                      onReadyWhatsapp: () => onReadyWhatsapp(card),
-                      onWarrantyWhatsapp: () => onWarrantyWhatsapp(card),
-                      onDelete: () => onDeleteDevice(card),
-                    ),
+                    itemCount: group.cards.length,
+                    itemBuilder: (context, index) {
+                      final card = group.cards[index];
+                      return _RepairCard(
+                        card: card,
+                        onPressed: () => onOpen(card),
+                        onReadyWhatsapp: () => onReadyWhatsapp(card),
+                        onWarrantyWhatsapp: () => onWarrantyWhatsapp(card),
+                        onDelete: () => onDeleteDevice(card),
+                      );
+                    },
                   );
                 },
               ),
@@ -2155,60 +2158,18 @@ class _MotionIn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 360 + delay.inMilliseconds),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        final total = (360 + delay.inMilliseconds).clamp(1, 1200).toDouble();
-        final start = delay.inMilliseconds == 0
-            ? 0.0
-            : (delay.inMilliseconds / total).clamp(0.0, 0.7).toDouble();
-        final progress = value <= start
-            ? 0.0
-            : ((value - start) / (1 - start)).clamp(0.0, 1.0).toDouble();
-        return Opacity(
-          opacity: progress,
-          child: Transform.translate(
-            offset: Offset(0, (1 - progress) * 12),
-            child: child,
-          ),
-        );
-      },
-      child: child,
-    );
+    return child;
   }
 }
 
-class _HoverLift extends StatefulWidget {
+class _HoverLift extends StatelessWidget {
   final Widget child;
 
   const _HoverLift({required this.child});
 
   @override
-  State<_HoverLift> createState() => _HoverLiftState();
-}
-
-class _HoverLiftState extends State<_HoverLift> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedScale(
-        scale: _hovered ? 1.018 : 1,
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOutCubic,
-        child: AnimatedSlide(
-          offset: _hovered ? const Offset(0, -0.012) : Offset.zero,
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          child: widget.child,
-        ),
-      ),
-    );
+    return child;
   }
 }
 
@@ -2233,7 +2194,7 @@ class _MiniText extends StatelessWidget {
   }
 }
 
-class _BlinkingAlertFrame extends StatefulWidget {
+class _BlinkingAlertFrame extends StatelessWidget {
   final Color color;
   final Widget child;
   final bool enabled;
@@ -2245,73 +2206,26 @@ class _BlinkingAlertFrame extends StatefulWidget {
   });
 
   @override
-  State<_BlinkingAlertFrame> createState() => _BlinkingAlertFrameState();
-}
-
-class _BlinkingAlertFrameState extends State<_BlinkingAlertFrame>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 480),
-    );
-    _sync();
-  }
-
-  @override
-  void didUpdateWidget(covariant _BlinkingAlertFrame oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.enabled != widget.enabled) _sync();
-  }
-
-  void _sync() {
-    if (widget.enabled) {
-      _controller.repeat(reverse: true);
-    } else {
-      _controller.stop();
-      _controller.value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
-
-    return AnimatedBuilder(
-      animation: _controller,
-      child: widget.child,
-      builder: (context, child) {
-        final pulse = Curves.easeInOut.transform(_controller.value);
-        return Container(
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            color: widget.color.withValues(alpha: 0.03 + (pulse * 0.16)),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: widget.color.withValues(alpha: 0.32 + (pulse * 0.66)),
-              width: 1.2 + (pulse * 1.8),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: widget.color.withValues(alpha: 0.12 + (pulse * 0.42)),
-                blurRadius: 6 + (pulse * 20),
-                spreadRadius: 1 + (pulse * 5),
-              ),
-            ],
+    if (!enabled) return child;
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withValues(alpha: 0.72),
+          width: 1.6,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.2),
+            blurRadius: 10,
+            spreadRadius: 1,
           ),
-          child: child,
-        );
-      },
+        ],
+      ),
+      child: child,
     );
   }
 }
@@ -2344,46 +2258,85 @@ class _DialogTitle extends StatelessWidget {
   }
 }
 
-class _IntakePhotosButton extends StatelessWidget {
+class IntakePhotosButton extends StatefulWidget {
   final String maintenanceId;
+  final Future<List<DevicePhotoModel>>? photosFuture;
 
-  const _IntakePhotosButton({required this.maintenanceId});
+  const IntakePhotosButton({
+    super.key,
+    required this.maintenanceId,
+    this.photosFuture,
+  });
+
+  @override
+  State<IntakePhotosButton> createState() => _IntakePhotosButtonState();
+}
+
+class _IntakePhotosButtonState extends State<IntakePhotosButton> {
+  late final Future<List<DevicePhotoModel>> _photosFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _photosFuture = widget.photosFuture ??
+        DevicePhotoRepository().getForMaintenance(widget.maintenanceId);
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<DevicePhotoModel>>(
-      future: DevicePhotoRepository().getForMaintenance(maintenanceId),
+      future: _photosFuture,
       builder: (context, snapshot) {
         final photos = (snapshot.data ?? const <DevicePhotoModel>[])
             .where((photo) => photo.stage == AppConstants.photoStageIntake)
             .toList();
         final loading = snapshot.connectionState == ConnectionState.waiting;
         final label = photos.isEmpty
-            ? 'صور الجهاز قبل الصيانة'
-            : 'صور الجهاز قبل الصيانة (${photos.length})';
-        return SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton.icon(
-            onPressed: loading
-                ? null
-                : () => showDialog<void>(
-                      context: context,
-                      builder: (dialogContext) =>
-                          _IntakePhotosDialog(photos: photos),
-                    ),
-            icon: loading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.photo_library_rounded),
-            label: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.cairo(fontWeight: FontWeight.w800),
+            ? 'عرض صور الجهاز'
+            : 'عرض صور الجهاز (${photos.length})';
+        return Semantics(
+          button: true,
+          label: label,
+          child: SizedBox(
+            key: const ValueKey('intake_photos_button'),
+            width: double.infinity,
+            height: 54,
+            child: OutlinedButton.icon(
+              onPressed: loading
+                  ? null
+                  : () => showDialog<void>(
+                        context: context,
+                        builder: (dialogContext) =>
+                            _IntakePhotosDialog(photos: photos),
+                      ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                backgroundColor:
+                    AppColors.primary.withValues(alpha: loading ? 0.04 : 0.08),
+                side: BorderSide(
+                  color: AppColors.primary.withValues(alpha: 0.72),
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.photo_library_rounded, size: 22),
+              label: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.cairo(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ),
         );
@@ -3383,8 +3336,8 @@ class _DeviceActionDialog extends StatelessWidget {
               const SizedBox(height: 12),
               _DeviceSummary(card: card),
               const SizedBox(height: 12),
-              _IntakePhotosButton(maintenanceId: m.id),
-              const SizedBox(height: 16),
+              IntakePhotosButton(maintenanceId: m.id),
+              const SizedBox(height: 20),
               _ActionButton(
                 color: AppColors.info,
                 asset: _repairGraphicAsset,

@@ -527,9 +527,7 @@ class _WarrantyAlertActionDialogState extends State<WarrantyAlertActionDialog> {
     Future<dynamic> Function() action,
     String successMessage,
   ) async {
-    setState(() {
-      _busy = true;
-    });
+    setState(() => _busy = true);
     try {
       await action();
       _changed = true;
@@ -550,11 +548,7 @@ class _WarrantyAlertActionDialogState extends State<WarrantyAlertActionDialog> {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-        });
-      }
+      if (mounted) setState(() => _busy = false);
     }
   }
 

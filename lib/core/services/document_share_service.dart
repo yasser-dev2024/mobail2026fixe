@@ -25,7 +25,7 @@ class DocumentShareService {
           'sharePdfToWhatsApp',
           {
             'filePath': filePath,
-            'phone': _normalizePhone(phone),
+            'phone': normalizeWhatsAppPhone(phone),
             'message': message,
           },
         );
@@ -81,12 +81,31 @@ class DocumentShareService {
     }
   }
 
-  static String _normalizePhone(String phone) {
-    final clean = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (clean.startsWith('0') && clean.length >= 9) {
-      return '966${clean.substring(1)}';
+  static String normalizeWhatsAppPhone(String phone) {
+    const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+    const persianDigits = '۰۱۲۳۴۵۶۷۸۹';
+    final western = phone.split('').map((character) {
+      final arabicIndex = arabicDigits.indexOf(character);
+      if (arabicIndex >= 0) return arabicIndex.toString();
+      final persianIndex = persianDigits.indexOf(character);
+      if (persianIndex >= 0) return persianIndex.toString();
+      return character;
+    }).join();
+
+    var digits = western.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('00')) {
+      digits = digits.substring(2);
     }
-    return clean;
+    if (digits.startsWith('9660')) {
+      return '966${digits.substring(4)}';
+    }
+    if (digits.startsWith('0') && digits.length >= 9) {
+      return '966${digits.substring(1)}';
+    }
+    if (digits.length == 9 && digits.startsWith('5')) {
+      return '966$digits';
+    }
+    return digits;
   }
 
   static String _normalizePdfName(String fileName) {

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/services/alert_sound_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../warranty/presentation/widgets/warranty_alert_action_dialog.dart';
 import '../../data/notification_model.dart';
 import '../cubit/notifications_cubit.dart';
 import '../cubit/notifications_state.dart';
+import '../widgets/recurring_alert_dialog.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -23,6 +24,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    AlertSoundService().stop();
     context.read<NotificationsCubit>().loadNotifications();
   }
 
@@ -36,7 +38,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           return Column(
             children: [
               _buildHeader(context, state, colors),
-              _buildFilterBar(context, colors),
+              _buildFilterBar(context, state, colors),
               Expanded(child: _buildBody(context, state, colors)),
             ],
           );
@@ -54,59 +56,104 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         color: colors.surface,
         border: Border(bottom: BorderSide(color: colors.border)),
       ),
-      child: Row(
-        children: [
-          Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final title = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'الإشعارات',
                 style: GoogleFonts.cairo(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: colors.textPrimary),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
+                ),
               ),
               if (unreadCount > 0)
                 Text(
                   '$unreadCount إشعار غير مقروء',
-                  style:
-                      GoogleFonts.cairo(fontSize: 13, color: AppColors.primary),
+                  style: GoogleFonts.cairo(
+                    fontSize: 13,
+                    color: AppColors.primary,
+                  ),
                 ),
             ],
-          ),
-          const Spacer(),
-          if (unreadCount > 0)
-            OutlinedButton.icon(
-              onPressed: () =>
-                  context.read<NotificationsCubit>().markAllAsRead(),
-              icon: const Icon(Icons.done_all_rounded, size: 18),
-              label: Text('تعليم الكل كمقروء',
-                  style: GoogleFonts.cairo(fontSize: 13)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          const SizedBox(width: 12),
-          IconButton(
+          );
+          final refresh = IconButton(
             onPressed: () =>
                 context.read<NotificationsCubit>().generateSmartNotifications(),
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'تحديث الإشعارات',
             color: colors.textSecondary,
-          ),
-        ],
+          );
+          final markAll = OutlinedButton.icon(
+            onPressed: () => context.read<NotificationsCubit>().markAllAsRead(),
+            icon: const Icon(Icons.done_all_rounded, size: 18),
+            label: Text(
+              'تعليم الكل كمقروء',
+              style: GoogleFonts.cairo(fontSize: 13),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+
+          if (constraints.maxWidth < 600) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: title),
+                    refresh,
+                  ],
+                ),
+                if (unreadCount > 0) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: markAll,
+                  ),
+                ],
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              title,
+              const Spacer(),
+              if (unreadCount > 0) markAll,
+              const SizedBox(width: 12),
+              refresh,
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildFilterBar(BuildContext context, AppColorsExtension colors) {
+  Widget _buildFilterBar(
+    BuildContext context,
+    NotificationsState state,
+    AppColorsExtension colors,
+  ) {
+    final activeNotifications = state is NotificationsLoaded
+        ? state.notifications
+            .where((notification) => notification.isAlertActiveNow)
+            .toList()
+        : const <NotificationModel>[];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       color: colors.surface,
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           _FilterChip(
             label: 'الكل',
@@ -129,6 +176,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   .loadNotifications(unreadOnly: true);
             },
           ),
+          if (activeNotifications.isNotEmpty)
+            OutlinedButton.icon(
+              onPressed: () => _snoozeNotifications(
+                context,
+                activeNotifications,
+              ),
+              icon: const Icon(Icons.snooze_rounded, size: 18),
+              label: Text(
+                'تأجيل الكل (${activeNotifications.length})',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.w700),
+              ),
+            ),
         ],
       ),
     );
@@ -173,18 +232,127 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             onRead: () =>
                 context.read<NotificationsCubit>().markAsRead(notif.id),
             onDelete: () => context.read<NotificationsCubit>().delete(notif.id),
+            onSnooze: () => _snoozeNotification(context, notif),
+            onResume: () => _resumeNotification(context, notif),
+            onStop: () => _stopNotification(context, notif),
             onTap: () => _handleTap(context, notif),
-          )
-              .animate()
-              .fadeIn(delay: Duration(milliseconds: i * 50))
-              .slideX(begin: 0.1);
+            onOpenReference: () => _handleReferenceTap(context, notif),
+          );
         },
       );
     }
     return const SizedBox.shrink();
   }
 
+  Future<void> _snoozeNotifications(
+    BuildContext context,
+    List<NotificationModel> notifications,
+  ) async {
+    final duration = await showAlertSnoozePicker(context);
+    if (duration == null || !context.mounted) return;
+    await AlertSoundService().stop();
+    if (!context.mounted) return;
+    await context.read<NotificationsCubit>().snoozeMany(
+          notifications.map((notification) => notification.id),
+          until: DateTime.now().add(duration).millisecondsSinceEpoch,
+          unreadOnly: _unreadOnly ? true : false,
+        );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'تم تأجيل ${notifications.length} تنبيهات',
+          style: GoogleFonts.cairo(),
+        ),
+        backgroundColor: AppColors.success,
+      ),
+    );
+  }
+
+  Future<void> _snoozeNotification(
+    BuildContext context,
+    NotificationModel notification,
+  ) async {
+    final duration = await showAlertSnoozePicker(context);
+    if (duration == null || !context.mounted) return;
+    await AlertSoundService().stop();
+    if (!context.mounted) return;
+    await context.read<NotificationsCubit>().snooze(
+          notification.id,
+          until: DateTime.now().add(duration).millisecondsSinceEpoch,
+          unreadOnly: _unreadOnly ? true : false,
+        );
+  }
+
+  Future<void> _resumeNotification(
+    BuildContext context,
+    NotificationModel notification,
+  ) async {
+    await AlertSoundService().stop();
+    if (!context.mounted) return;
+    await context.read<NotificationsCubit>().resumeAlert(
+          notification.id,
+          unreadOnly: _unreadOnly ? true : false,
+        );
+  }
+
+  Future<void> _stopNotification(
+    BuildContext context,
+    NotificationModel notification,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text(
+            'إيقاف هذا التنبيه؟',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            'يمكنك استئناف التنبيه لاحقاً من هذه الشاشة.',
+            style: GoogleFonts.cairo(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text('إلغاء', style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text('إيقاف', style: GoogleFonts.cairo()),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await AlertSoundService().stop();
+    if (!context.mounted) return;
+    await context.read<NotificationsCubit>().stopAlert(
+          notification.id,
+          unreadOnly: _unreadOnly ? true : false,
+        );
+  }
+
   Future<void> _handleTap(BuildContext context, NotificationModel notif) async {
+    await AlertSoundService().stop();
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => RecurringAlertDialog(notification: notif),
+    );
+    if (!context.mounted) return;
+    await context.read<NotificationsCubit>().loadNotifications(
+          unreadOnly: _unreadOnly ? true : false,
+        );
+  }
+
+  Future<void> _handleReferenceTap(
+    BuildContext context,
+    NotificationModel notif,
+  ) async {
     final notificationsCubit = context.read<NotificationsCubit>();
     await notificationsCubit.markAsRead(notif.id);
     if (!context.mounted) return;
@@ -262,7 +430,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ],
       ),
-    ).animate().fadeIn().scale(begin: const Offset(0.8, 0.8));
+    );
   }
 }
 
@@ -300,51 +468,35 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _NotificationCard extends StatefulWidget {
+class _NotificationCard extends StatelessWidget {
   final NotificationModel notification;
   final VoidCallback onRead;
   final VoidCallback onDelete;
+  final VoidCallback onSnooze;
+  final VoidCallback onResume;
+  final VoidCallback onStop;
   final VoidCallback onTap;
+  final VoidCallback onOpenReference;
 
   const _NotificationCard({
     required this.notification,
     required this.onRead,
     required this.onDelete,
+    required this.onSnooze,
+    required this.onResume,
+    required this.onStop,
     required this.onTap,
+    required this.onOpenReference,
   });
 
   @override
-  State<_NotificationCard> createState() => _NotificationCardState();
-}
-
-class _NotificationCardState extends State<_NotificationCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 520))
-      ..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.12, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final n = widget.notification;
+    final n = notification;
     final colors = context.appColors;
     final priorityColor = n.priorityColor;
     final isCritical = n.priority == 'critical';
+    final isWarranty =
+        n.referenceType == 'warranty' || n.type.startsWith('warranty_');
 
     return Dismissible(
       key: Key(n.id),
@@ -359,9 +511,9 @@ class _NotificationCardState extends State<_NotificationCard>
         ),
         child: const Icon(Icons.delete_rounded, color: Colors.white),
       ),
-      onDismissed: (_) => widget.onDelete(),
+      onDismissed: (_) => onDelete(),
       child: GestureDetector(
-        onTap: widget.onTap,
+        onTap: onTap,
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
@@ -389,7 +541,7 @@ class _NotificationCardState extends State<_NotificationCard>
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Icon with pulse dot for critical
+                // Fixed priority icon: no repeating scale/pulse animation.
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   child: Stack(
@@ -408,27 +560,21 @@ class _NotificationCardState extends State<_NotificationCard>
                         Positioned(
                           right: 0,
                           top: 0,
-                          child: AnimatedBuilder(
-                            animation: _pulseAnim,
-                            builder: (_, __) => Opacity(
-                              opacity: _pulseAnim.value,
-                              child: Container(
-                                width: 18,
-                                height: 18,
-                                decoration: BoxDecoration(
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                              boxShadow: const [
+                                BoxShadow(
                                   color: AppColors.error,
-                                  shape: BoxShape.circle,
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: AppColors.error,
-                                      blurRadius: 12,
-                                      spreadRadius: 3,
-                                    ),
-                                  ],
-                                  border: Border.all(
-                                      color: Colors.white, width: 1.5),
+                                  blurRadius: 6,
+                                  spreadRadius: 1,
                                 ),
-                              ),
+                              ],
+                              border:
+                                  Border.all(color: Colors.white, width: 1.5),
                             ),
                           ),
                         ),
@@ -477,6 +623,61 @@ class _NotificationCardState extends State<_NotificationCard>
                           style: GoogleFonts.cairo(
                               fontSize: 11, color: colors.textSecondary),
                         ),
+                        if (n.alertStopped || n.isSnoozedNow) ...[
+                          const SizedBox(height: 6),
+                          _AlertStateBadge(notification: n),
+                        ],
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: [
+                            if (n.alertStopped || n.isSnoozedNow)
+                              TextButton.icon(
+                                onPressed: onResume,
+                                icon: const Icon(
+                                  Icons.notifications_active_rounded,
+                                  size: 17,
+                                ),
+                                label: Text(
+                                  'استئناف الآن',
+                                  style: GoogleFonts.cairo(fontSize: 11),
+                                ),
+                              )
+                            else ...[
+                              TextButton.icon(
+                                onPressed: onSnooze,
+                                icon:
+                                    const Icon(Icons.snooze_rounded, size: 17),
+                                label: Text(
+                                  'تأجيل',
+                                  style: GoogleFonts.cairo(fontSize: 11),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: onStop,
+                                icon: const Icon(
+                                  Icons.notifications_off_rounded,
+                                  size: 17,
+                                ),
+                                label: Text(
+                                  'إيقاف',
+                                  style: GoogleFonts.cairo(fontSize: 11),
+                                ),
+                              ),
+                            ],
+                            if (isWarranty)
+                              TextButton.icon(
+                                onPressed: onOpenReference,
+                                icon:
+                                    const Icon(Icons.update_rounded, size: 17),
+                                label: Text(
+                                  'إدارة وتجديد الضمان',
+                                  style: GoogleFonts.cairo(fontSize: 11),
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -487,14 +688,14 @@ class _NotificationCardState extends State<_NotificationCard>
                   children: [
                     if (!n.isRead)
                       IconButton(
-                        onPressed: widget.onRead,
+                        onPressed: onRead,
                         icon:
                             const Icon(Icons.mark_email_read_rounded, size: 18),
                         tooltip: 'تعليم كمقروء',
                         color: AppColors.primary,
                       ),
                     IconButton(
-                      onPressed: widget.onDelete,
+                      onPressed: onDelete,
                       icon: const Icon(Icons.delete_outline_rounded, size: 18),
                       tooltip: 'حذف',
                       color: colors.textSecondary,
@@ -508,6 +709,43 @@ class _NotificationCardState extends State<_NotificationCard>
         ),
       ),
     );
+  }
+}
+
+class _AlertStateBadge extends StatelessWidget {
+  final NotificationModel notification;
+
+  const _AlertStateBadge({required this.notification});
+
+  @override
+  Widget build(BuildContext context) {
+    final stopped = notification.alertStopped;
+    final color = stopped ? AppColors.error : AppColors.warning;
+    final text = stopped
+        ? 'التنبيه متوقف'
+        : 'مؤجل حتى ${_dateTimeLabel(notification.snoozedUntil!)}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.cairo(
+          color: color,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  String _dateTimeLabel(int milliseconds) {
+    final date = DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '${date.day}/${date.month} ${date.hour}:$minute';
   }
 }
 

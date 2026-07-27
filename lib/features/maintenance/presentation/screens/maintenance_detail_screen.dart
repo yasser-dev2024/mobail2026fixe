@@ -942,8 +942,12 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
     setState(() => _documentBusy = true);
     try {
       final ok = await InvoiceRepository().sendWhatsApp(invoice.id);
-      _showMessage(ok ? 'تم فتح واتساب لإرسال الفاتورة' : 'تعذر فتح واتساب',
-          error: !ok);
+      _showMessage(
+        ok
+            ? 'تم فتح محادثة عميل هذا السجل في واتساب لإرسال الفاتورة'
+            : 'تعذر فتح محادثة العميل في واتساب',
+        error: !ok,
+      );
       await _loadWorkflowExtensions();
     } catch (e) {
       _showMessage('تعذر إرسال الفاتورة: $e', error: true);
@@ -1751,7 +1755,7 @@ WHERE m.shop_id = ? AND m.id = ? LIMIT 1
 
   Future<void> _reloadMaintenanceAfterAction() async {
     if (!mounted) return;
-    context.read<NotificationsCubit>().loadNotifications();
+    context.read<NotificationsCubit>().generateSmartNotifications();
     context.read<MaintenanceCubit>().loadById(widget.maintenanceId);
     await _loadWorkflowExtensions();
     await _loadWhatsappMessages();

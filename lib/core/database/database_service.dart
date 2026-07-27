@@ -94,6 +94,7 @@ class DatabaseService {
     _createBackupLogsTable(batch);
     await batch.commit(noResult: true);
     await _insertDefaultData(db);
+    await _ensureWhatsappMessageTemplateSeeds(db);
     await _ensureLocalShopIdentity(db);
   }
 
@@ -163,6 +164,10 @@ class DatabaseService {
     }
     if (oldVersion < 10) {
       await _ensureWarrantyManagementSchema(db);
+    }
+    if (oldVersion < 11) {
+      await _ensureAlertRecurrenceSchema(db);
+      await _ensureWhatsappMessageTemplateSeeds(db);
     }
   }
 
@@ -595,12 +600,21 @@ class DatabaseService {
       reference_id TEXT,
       reference_type TEXT,
       is_read INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      snoozed_until INTEGER,
+      alert_stopped INTEGER NOT NULL DEFAULT 0,
+      alert_stopped_at INTEGER,
+      alert_stopped_by TEXT,
+      last_fired_at INTEGER
     )''');
     batch.execute('CREATE INDEX idx_notif_shop ON notifications(shop_id)');
     batch.execute('CREATE INDEX idx_notif_read ON notifications(is_read)');
     batch
         .execute('CREATE INDEX idx_notif_created ON notifications(created_at)');
+    batch.execute(
+        'CREATE INDEX idx_notif_stopped ON notifications(alert_stopped)');
+    batch.execute(
+        'CREATE INDEX idx_notif_snoozed ON notifications(snoozed_until)');
   }
 
   void _createWhatsappTemplatesTable(Batch batch) {
@@ -943,6 +957,11 @@ class DatabaseService {
       'alert_sounds_enabled': 'true',
       'device_stay_alert_sound_path': '',
       'warranty_alert_sound_path': '',
+      'alert_check_interval_minutes': '30',
+      'alert_volume': '1.0',
+      'alert_vibration_enabled': 'true',
+      'alert_repeat_count': '1',
+      'whatsapp_message_types_master_enabled': 'true',
     };
     for (final entry in defaults.entries) {
       batch.insert(
@@ -1226,6 +1245,80 @@ class DatabaseService {
         [shopId],
       );
     } catch (_) {}
+  }
+
+  static const _wamsgTemplateKeyPrefix = 'wamsg_';
+
+  Future<void> _ensureAlertRecurrenceSchema(Database db) async {
+    for (final column in const [
+      'snoozed_until INTEGER',
+      'alert_stopped INTEGER NOT NULL DEFAULT 0',
+      'alert_stopped_at INTEGER',
+      'alert_stopped_by TEXT',
+      'last_fired_at INTEGER',
+    ]) {
+      try {
+        await db.execute('ALTER TABLE notifications ADD COLUMN $column');
+      } catch (_) {
+        // Column may already exist on development databases.
+      }
+    }
+    try {
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_notif_stopped ON notifications(alert_stopped)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_notif_snoozed ON notifications(snoozed_until)',
+      );
+    } catch (_) {}
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final batch = db.batch();
+    for (final entry in <String, String>{
+      'alert_check_interval_minutes': '30',
+      'alert_volume': '1.0',
+      'alert_vibration_enabled': 'true',
+      'alert_repeat_count': '1',
+      'whatsapp_message_types_master_enabled': 'true',
+    }.entries) {
+      batch.insert(
+        'settings',
+        {'key': entry.key, 'value': entry.value, 'updated_at': now},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Seeds one inactive-by-default-text `whatsapp_templates` row per
+  /// automatic maintenance-workflow message type (`wamsg_*` keys, distinct
+  /// from the manual-composer's `waTpl*` keys which reuse some of the same
+  /// raw strings, e.g. both have a 'ready' type). `template` is left empty
+  /// on purpose: `WhatsappRepository._buildMessage` only overrides its
+  /// existing hardcoded wording when a row's `template` is non-empty, so
+  /// seeding empty rows changes nothing until a shop owner writes their own
+  /// text in the new WhatsApp message settings page. `is_active` defaults to
+  /// 1 (message type enabled), matching today's behavior of every automatic
+  /// message being sent.
+  Future<void> _ensureWhatsappMessageTemplateSeeds(Database db) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final batch = db.batch();
+    for (final type in AppConstants.whatsappMessageTypeLabels.keys) {
+      batch.insert(
+        'whatsapp_templates',
+        {
+          'id': 'tpl_$_wamsgTemplateKeyPrefix$type',
+          'key': '$_wamsgTemplateKeyPrefix$type',
+          'name': AppConstants.whatsappMessageTypeLabels[type]!,
+          'template': '',
+          'is_active': 1,
+          'created_at': now,
+          'updated_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<void> _ensureNotificationShopScope(Database db) async {

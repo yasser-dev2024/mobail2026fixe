@@ -1,5 +1,6 @@
 import '../constants/app_constants.dart';
 import '../database/database_service.dart';
+import 'background_alert_service.dart';
 
 class SettingsService {
   static final SettingsService _instance = SettingsService._internal();
@@ -85,10 +86,25 @@ class SettingsService {
   bool get autoBackup => _cache['auto_backup'] == 'true';
   bool get autoWhatsappSend => _cache['auto_whatsapp_send'] == 'true';
   bool get alertSoundsEnabled => _cache['alert_sounds_enabled'] != 'false';
-  String get deviceStayAlertSoundPath =>
-      _cache['device_stay_alert_sound_path'] ?? '';
-  String get warrantyAlertSoundPath =>
-      _cache['warranty_alert_sound_path'] ?? '';
+  int get alertCheckIntervalMinutes {
+    final minutes = int.tryParse(_cache['alert_check_interval_minutes'] ?? '');
+    return (minutes == null || minutes <= 0) ? 30 : minutes;
+  }
+
+  double get alertVolume {
+    final volume = double.tryParse(_cache['alert_volume'] ?? '');
+    return (volume == null) ? 1.0 : volume.clamp(0.0, 1.0);
+  }
+
+  bool get alertVibrationEnabled =>
+      _cache['alert_vibration_enabled'] != 'false';
+
+  /// `0` or negative means "repeat until stopped".
+  int get alertRepeatCount =>
+      int.tryParse(_cache['alert_repeat_count'] ?? '') ?? 1;
+
+  bool get whatsappMessageTypesMasterEnabled =>
+      _cache['whatsapp_message_types_master_enabled'] != 'false';
   bool get shopSetupCompleted => _cache['shop_setup_completed'] == 'true';
   int get autoBackupInterval {
     final days = int.tryParse(_cache['auto_backup_interval'] ?? '') ??
@@ -142,6 +158,9 @@ class SettingsService {
       await _db.setSetting(entry.key, entry.value);
       _cache[entry.key] = entry.value;
     }
+    if (settings.containsKey('alert_check_interval_minutes')) {
+      await BackgroundAlertService().reschedule();
+    }
   }
 
   /// Saves the one-time shop setup data and prevents showing the setup gate on
@@ -168,6 +187,9 @@ class SettingsService {
   Future<void> setSetting(String key, String value) async {
     await _db.setSetting(key, value);
     _cache[key] = value;
+    if (key == 'alert_check_interval_minutes') {
+      await BackgroundAlertService().reschedule();
+    }
   }
 
   /// Invalidates the cache and reloads all settings from the database.

@@ -108,8 +108,12 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   Future<void> _sendWhatsApp(InvoiceModel invoice) async {
     try {
       final ok = await _repo.sendWhatsApp(invoice.id);
-      _snack(ok ? 'تم فتح واتساب لإرسال الفاتورة' : 'تعذر فتح واتساب',
-          error: !ok);
+      _snack(
+        ok
+            ? 'تم فتح محادثة عميل الفاتورة في واتساب'
+            : 'تعذر فتح محادثة العميل في واتساب',
+        error: !ok,
+      );
       await _load();
     } catch (e) {
       _snack(e.toString(), error: true);

@@ -21,7 +21,13 @@ class _WarrantyScreenState extends State<WarrantyScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late final WarrantyCubit _cubit;
+  final _nameSearchController = TextEditingController();
+  final _phoneSearchController = TextEditingController();
+  final _recordSearchController = TextEditingController();
   _DurationFilter _durationFilter = _DurationFilter.all;
+  String _nameQuery = '';
+  String _phoneQuery = '';
+  String _recordQuery = '';
 
   static const _tabs = [
     _TabDef('الكل', null),
@@ -47,6 +53,9 @@ class _WarrantyScreenState extends State<WarrantyScreen>
   void dispose() {
     _tabController.dispose();
     _cubit.close();
+    _nameSearchController.dispose();
+    _phoneSearchController.dispose();
+    _recordSearchController.dispose();
     super.dispose();
   }
 
@@ -62,37 +71,39 @@ class _WarrantyScreenState extends State<WarrantyScreen>
           builder: (context, state) {
             final stats =
                 state is WarrantyLoaded ? state.stats : <String, dynamic>{};
+            final compactHeight = MediaQuery.sizeOf(context).height < 600;
 
             return Column(
               children: [
                 // ── Stats cards ────────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      _StatCard(
-                        label: 'ساري',
-                        value: '${stats['active'] ?? 0}',
-                        color: AppColors.warrantyActive,
-                        icon: Icons.verified_user_rounded,
-                      ),
-                      const SizedBox(width: 12),
-                      _StatCard(
-                        label: 'ينتهي قريباً',
-                        value: '${stats['expiringSoon'] ?? 0}',
-                        color: AppColors.warrantyExpiringSoon,
-                        icon: Icons.timer_rounded,
-                      ),
-                      const SizedBox(width: 12),
-                      _StatCard(
-                        label: 'منتهي',
-                        value: '${stats['expired'] ?? 0}',
-                        color: AppColors.warrantyExpired,
-                        icon: Icons.cancel_rounded,
-                      ),
-                    ],
+                if (!compactHeight)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        _StatCard(
+                          label: 'ساري',
+                          value: '${stats['active'] ?? 0}',
+                          color: AppColors.warrantyActive,
+                          icon: Icons.verified_user_rounded,
+                        ),
+                        const SizedBox(width: 12),
+                        _StatCard(
+                          label: 'ينتهي قريباً',
+                          value: '${stats['expiringSoon'] ?? 0}',
+                          color: AppColors.warrantyExpiringSoon,
+                          icon: Icons.timer_rounded,
+                        ),
+                        const SizedBox(width: 12),
+                        _StatCard(
+                          label: 'منتهي',
+                          value: '${stats['expired'] ?? 0}',
+                          color: AppColors.warrantyExpired,
+                          icon: Icons.cancel_rounded,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
                 // ── Tabs ───────────────────────────────────────────────────────
                 Container(
@@ -102,44 +113,29 @@ class _WarrantyScreenState extends State<WarrantyScreen>
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
                     labelStyle: GoogleFonts.cairo(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                    unselectedLabelStyle: GoogleFonts.cairo(fontSize: 13),
-                    tabs: _tabs.map((t) => Tab(text: t.label)).toList(),
+                      fontSize: compactHeight ? 11 : 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    unselectedLabelStyle:
+                        GoogleFonts.cairo(fontSize: compactHeight ? 11 : 13),
+                    tabs: _tabs
+                        .map(
+                          (t) => Tab(
+                            height: compactHeight ? 38 : null,
+                            text: t.label,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
 
-                // ── List ───────────────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: SegmentedButton<_DurationFilter>(
-                      segments: const [
-                        ButtonSegment(
-                          value: _DurationFilter.all,
-                          icon: Icon(Icons.verified_user_rounded),
-                          label: Text('كل الضمانات'),
-                        ),
-                        ButtonSegment(
-                          value: _DurationFilter.short,
-                          icon: Icon(Icons.bolt_rounded),
-                          label: Text('الضمانات القصيرة'),
-                        ),
-                        ButtonSegment(
-                          value: _DurationFilter.long,
-                          icon: Icon(Icons.calendar_month_rounded),
-                          label: Text('الضمانات الطويلة'),
-                        ),
-                      ],
-                      selected: {_durationFilter},
-                      onSelectionChanged: (selection) {
-                        setState(() => _durationFilter = selection.first);
-                      },
-                    ),
-                  ),
-                ),
+                _buildFilters(compactHeight: compactHeight),
                 Expanded(
-                  child: _buildContent(context, state),
+                  child: _buildContent(
+                    context,
+                    state,
+                    compactHeight: compactHeight,
+                  ),
                 ),
               ],
             );
@@ -149,7 +145,143 @@ class _WarrantyScreenState extends State<WarrantyScreen>
     );
   }
 
-  Widget _buildContent(BuildContext context, WarrantyState state) {
+  Widget _buildFilters({required bool compactHeight}) {
+    return Padding(
+      padding: compactHeight
+          ? const EdgeInsets.fromLTRB(8, 6, 8, 4)
+          : const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final narrowDurationSelector = constraints.maxWidth < 520;
+              final durationControl = SegmentedButton<_DurationFilter>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(
+                    value: _DurationFilter.all,
+                    icon: const Icon(Icons.verified_user_rounded),
+                    label: Text(
+                      narrowDurationSelector ? 'الكل' : 'كل الضمانات',
+                    ),
+                  ),
+                  ButtonSegment(
+                    value: _DurationFilter.short,
+                    icon: const Icon(Icons.bolt_rounded),
+                    label: Text(
+                      narrowDurationSelector ? 'قصيرة' : 'الضمانات القصيرة',
+                    ),
+                  ),
+                  ButtonSegment(
+                    value: _DurationFilter.long,
+                    icon: const Icon(Icons.calendar_month_rounded),
+                    label: Text(
+                      narrowDurationSelector ? 'طويلة' : 'الضمانات الطويلة',
+                    ),
+                  ),
+                ],
+                selected: {_durationFilter},
+                onSelectionChanged: (selection) {
+                  setState(() => _durationFilter = selection.first);
+                },
+              );
+              final durationSelector = narrowDurationSelector
+                  ? Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: durationControl,
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: durationControl,
+                    );
+              final fields = [
+                _WarrantySearchField(
+                  controller: _nameSearchController,
+                  label: 'بحث باسم العميل',
+                  icon: Icons.person_search_rounded,
+                  onChanged: (value) => setState(() => _nameQuery = value),
+                  onClear: () => setState(() {
+                    _nameSearchController.clear();
+                    _nameQuery = '';
+                  }),
+                ),
+                _WarrantySearchField(
+                  controller: _phoneSearchController,
+                  label: 'بحث برقم الجوال',
+                  icon: Icons.phone_rounded,
+                  keyboardType: TextInputType.phone,
+                  onChanged: (value) => setState(() => _phoneQuery = value),
+                  onClear: () => setState(() {
+                    _phoneSearchController.clear();
+                    _phoneQuery = '';
+                  }),
+                ),
+                _WarrantySearchField(
+                  controller: _recordSearchController,
+                  label: 'الجهاز أو رقم الطلب',
+                  icon: Icons.manage_search_rounded,
+                  onChanged: (value) => setState(() => _recordQuery = value),
+                  onClear: () => setState(() {
+                    _recordSearchController.clear();
+                    _recordQuery = '';
+                  }),
+                ),
+              ];
+
+              if (compactHeight && constraints.maxWidth >= 680) {
+                return Row(
+                  children: [
+                    SizedBox(width: 330, child: durationSelector),
+                    const SizedBox(width: 8),
+                    for (var i = 0; i < fields.length; i++) ...[
+                      Expanded(child: fields[i]),
+                      if (i != fields.length - 1) const SizedBox(width: 6),
+                    ],
+                  ],
+                );
+              }
+
+              final searchFields = constraints.maxWidth < 680
+                  ? Column(
+                      children: [
+                        for (var i = 0; i < fields.length; i++) ...[
+                          fields[i],
+                          if (i != fields.length - 1) const SizedBox(height: 8),
+                        ],
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        for (var i = 0; i < fields.length; i++) ...[
+                          Expanded(child: fields[i]),
+                          if (i != fields.length - 1) const SizedBox(width: 10),
+                        ],
+                      ],
+                    );
+
+              return Column(
+                children: [
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: durationSelector,
+                  ),
+                  const SizedBox(height: 10),
+                  searchFields,
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    WarrantyState state, {
+    required bool compactHeight,
+  }) {
     if (state is WarrantyLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -175,8 +307,14 @@ class _WarrantyScreenState extends State<WarrantyScreen>
       );
     }
     if (state is WarrantyLoaded) {
-      final items = _filterByDuration(state.items);
-      if (items.isEmpty) {
+      final durationItems = _filterByDuration(state.items);
+      final items = filterWarrantyRows(
+        durationItems,
+        nameQuery: _nameQuery,
+        phoneQuery: _phoneQuery,
+        recordQuery: _recordQuery,
+      );
+      if (durationItems.isEmpty) {
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -195,17 +333,26 @@ class _WarrantyScreenState extends State<WarrantyScreen>
           ),
         );
       }
-      return GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 230,
-          mainAxisExtent: 230,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
+      if (items.isEmpty) {
+        return _EmptyWarrantySearch(
+          onClear: () => setState(() {
+            _nameSearchController.clear();
+            _phoneSearchController.clear();
+            _recordSearchController.clear();
+            _nameQuery = '';
+            _phoneQuery = '';
+            _recordQuery = '';
+          }),
+        );
+      }
+      return Padding(
+        padding: compactHeight
+            ? const EdgeInsets.fromLTRB(8, 2, 8, 6)
+            : const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: _WarrantyTable(
+          items: items,
+          totalCount: durationItems.length,
         ),
-        itemCount: items.length,
-        itemBuilder: (context, index) =>
-            _WarrantyCircle(warranty: items[index]),
       );
     }
     return const SizedBox.shrink();
@@ -228,84 +375,413 @@ class _WarrantyScreenState extends State<WarrantyScreen>
 
 enum _DurationFilter { all, short, long }
 
-class _WarrantyCircle extends StatelessWidget {
-  final WarrantyModel warranty;
+List<WarrantyModel> filterWarrantyRows(
+  List<WarrantyModel> items, {
+  String nameQuery = '',
+  String phoneQuery = '',
+  String recordQuery = '',
+}) {
+  final name = nameQuery.trim().toLowerCase();
+  final phone = _searchDigits(phoneQuery);
+  final record = recordQuery.trim().toLowerCase();
 
-  const _WarrantyCircle({required this.warranty});
+  return items.where((item) {
+    final matchesName =
+        name.isEmpty || (item.customerName ?? '').toLowerCase().contains(name);
+    final matchesPhone = phone.isEmpty ||
+        _searchDigits(item.customerPhone ?? '').contains(phone);
+    final matchesRecord = record.isEmpty ||
+        (item.ticketNumber ?? '').toLowerCase().contains(record) ||
+        item.deviceInfo.toLowerCase().contains(record);
+    return matchesName && matchesPhone && matchesRecord;
+  }).toList(growable: false);
+}
+
+String _searchDigits(String value) {
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+  const persianDigits = '۰۱۲۳۴۵۶۷۸۹';
+  final western = value.split('').map((character) {
+    final arabicIndex = arabicDigits.indexOf(character);
+    if (arabicIndex >= 0) return arabicIndex.toString();
+    final persianIndex = persianDigits.indexOf(character);
+    if (persianIndex >= 0) return persianIndex.toString();
+    return character;
+  }).join();
+  return western.replaceAll(RegExp(r'[^0-9]'), '');
+}
+
+class _WarrantySearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _WarrantySearchField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.onChanged,
+    required this.onClear,
+    this.keyboardType,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (warranty.status) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'مسح البحث',
+                onPressed: onClear,
+                icon: const Icon(Icons.close_rounded),
+              ),
+        isDense: true,
+      ),
+    );
+  }
+}
+
+class _EmptyWarrantySearch extends StatelessWidget {
+  final VoidCallback onClear;
+
+  const _EmptyWarrantySearch({required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 64,
+            color: colors.textSecondary.withValues(alpha: 0.45),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'لا توجد نتائج مطابقة',
+            style: GoogleFonts.cairo(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: colors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: onClear,
+            icon: const Icon(Icons.restart_alt_rounded),
+            label: Text('مسح البحث', style: GoogleFonts.cairo()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WarrantyTable extends StatefulWidget {
+  final List<WarrantyModel> items;
+  final int totalCount;
+
+  const _WarrantyTable({
+    required this.items,
+    required this.totalCount,
+  });
+
+  @override
+  State<_WarrantyTable> createState() => _WarrantyTableState();
+}
+
+class _WarrantyTableState extends State<_WarrantyTable> {
+  final _horizontalController = ScrollController();
+  final _verticalController = ScrollController();
+
+  @override
+  void dispose() {
+    _horizontalController.dispose();
+    _verticalController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tableWidth =
+            constraints.maxWidth < 1080 ? 1080.0 : constraints.maxWidth;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: colors.border.withValues(alpha: 0.7),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Text(
+                  widget.items.length == widget.totalCount
+                      ? '${widget.items.length} ضمان'
+                      : 'عرض ${widget.items.length} من ${widget.totalCount} ضمان',
+                  style: GoogleFonts.cairo(
+                    color: colors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Divider(height: 1, color: colors.border),
+              Expanded(
+                child: Scrollbar(
+                  controller: _horizontalController,
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _horizontalController,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: tableWidth,
+                      height: constraints.maxHeight - 39,
+                      child: Column(
+                        children: [
+                          const _WarrantyTableHeader(),
+                          Expanded(
+                            child: Scrollbar(
+                              controller: _verticalController,
+                              thumbVisibility: widget.items.length > 8,
+                              child: ListView.separated(
+                                controller: _verticalController,
+                                padding: const EdgeInsets.only(bottom: 12),
+                                itemCount: widget.items.length,
+                                separatorBuilder: (_, __) => Divider(
+                                  height: 1,
+                                  color: colors.border.withValues(alpha: 0.55),
+                                ),
+                                itemBuilder: (context, index) =>
+                                    _WarrantyTableRow(
+                                  warranty: widget.items[index],
+                                  shaded: index.isOdd,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WarrantyTableHeader extends StatelessWidget {
+  const _WarrantyTableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      color: AppColors.primary.withValues(alpha: 0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: const Row(
+        children: [
+          _WarrantyCell(text: 'رقم الطلب', flex: 2, header: true),
+          _WarrantyCell(text: 'اسم العميل', flex: 3, header: true),
+          _WarrantyCell(text: 'الجوال', flex: 2, header: true),
+          _WarrantyCell(text: 'الجهاز', flex: 4, header: true),
+          _WarrantyCell(text: 'الحالة', flex: 2, header: true),
+          _WarrantyCell(text: 'المدة', flex: 2, header: true),
+          _WarrantyCell(text: 'تاريخ الانتهاء', flex: 2, header: true),
+          _WarrantyCell(text: 'المتبقي', flex: 2, header: true),
+          SizedBox(width: 38),
+        ],
+      ),
+    );
+  }
+}
+
+class _WarrantyTableRow extends StatelessWidget {
+  final WarrantyModel warranty;
+  final bool shaded;
+
+  const _WarrantyTableRow({
+    required this.warranty,
+    required this.shaded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final statusColor = switch (warranty.status) {
       'active' => AppColors.warrantyActive,
       'expiring' => AppColors.warrantyExpiringSoon,
       _ => AppColors.warrantyExpired,
     };
-    final colors = context.appColors;
+    final endDate = DateTime.fromMillisecondsSinceEpoch(warranty.endDate);
+
     return Semantics(
       button: true,
       label:
-          '${warranty.customerName}, ${warranty.deviceInfo}, ${warranty.customerPhone}',
+          '${warranty.customerName}, ${warranty.customerPhone}, ${warranty.deviceInfo}',
       child: Material(
-        color: colors.card,
-        shape: CircleBorder(
-          side: BorderSide(color: color.withValues(alpha: 0.75), width: 3),
-        ),
-        elevation: 4,
-        shadowColor: color.withValues(alpha: 0.28),
+        color: shaded
+            ? colors.surface.withValues(alpha: 0.45)
+            : Colors.transparent,
         child: InkWell(
-          customBorder: const CircleBorder(),
           onTap: () => context.go('/maintenance/${warranty.maintenanceId}'),
-          child: Padding(
-            padding: const EdgeInsets.all(25),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.verified_user_rounded, color: color, size: 28),
-                const SizedBox(height: 8),
-                Text(
-                  warranty.customerName ?? 'عميل غير محدد',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.cairo(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: colors.textPrimary,
+          child: SizedBox(
+            height: 58,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                children: [
+                  _WarrantyCell(
+                    text: warranty.ticketNumber ?? '—',
+                    flex: 2,
+                    color: AppColors.primary,
+                    weight: FontWeight.w800,
                   ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  warranty.deviceInfo,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.cairo(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: colors.textSecondary,
+                  _WarrantyCell(
+                    text: warranty.customerName ?? 'عميل غير محدد',
+                    flex: 3,
+                    weight: FontWeight.w700,
                   ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  warranty.customerPhone?.trim().isNotEmpty == true
-                      ? warranty.customerPhone!
-                      : 'بدون رقم جوال',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textDirection: TextDirection.ltr,
-                  style: GoogleFonts.cairo(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: color,
+                  _WarrantyCell(
+                    text: warranty.customerPhone?.trim().isNotEmpty == true
+                        ? warranty.customerPhone!
+                        : 'بدون رقم',
+                    flex: 2,
+                    ltr: true,
                   ),
-                ),
-              ],
+                  _WarrantyCell(text: warranty.deviceInfo, flex: 4),
+                  Expanded(
+                    flex: 2,
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.11),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Text(
+                          warranty.statusLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                            color: statusColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  _WarrantyCell(
+                    text: '${warranty.warrantyDays} يوم',
+                    flex: 2,
+                  ),
+                  _WarrantyCell(
+                    text: DateFormat('yyyy/MM/dd').format(endDate),
+                    flex: 2,
+                    ltr: true,
+                  ),
+                  _WarrantyCell(
+                    text: _remainingWarrantyLabel(warranty),
+                    flex: 2,
+                    color: statusColor,
+                    weight: FontWeight.w800,
+                  ),
+                  const SizedBox(
+                    width: 38,
+                    child: Icon(
+                      Icons.chevron_left_rounded,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _WarrantyCell extends StatelessWidget {
+  final String text;
+  final int flex;
+  final bool header;
+  final bool ltr;
+  final Color? color;
+  final FontWeight? weight;
+
+  const _WarrantyCell({
+    required this.text,
+    required this.flex,
+    this.header = false,
+    this.ltr = false,
+    this.color,
+    this.weight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Expanded(
+      flex: flex,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textDirection: ltr ? TextDirection.ltr : null,
+          textAlign: ltr ? TextAlign.right : null,
+          style: GoogleFonts.cairo(
+            color:
+                color ?? (header ? colors.textPrimary : colors.textSecondary),
+            fontSize: header ? 12 : 12.5,
+            fontWeight: weight ?? (header ? FontWeight.w800 : FontWeight.w600),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _remainingWarrantyLabel(WarrantyModel warranty) {
+  if (warranty.isVoid) return 'ملغي';
+  if (warranty.expiryApproved) return 'منتهي ومعتمد';
+  final days = warranty.calendarDaysRemaining;
+  if (days < 0) return 'منذ ${days.abs()} يوم';
+  if (days == 0) return 'ينتهي اليوم';
+  return '$days يوم';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

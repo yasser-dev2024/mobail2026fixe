@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/database/database_service.dart';
+import '../../../../core/services/background_alert_service.dart';
 import '../../../../core/services/settings_service.dart';
 import '../../../../features/auth/data/auth_repository.dart';
 
@@ -20,9 +22,10 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   static const _minimumSplashDuration = Duration(seconds: 6);
   static const _privacyPolicyVersion = '2026-07-17.1';
+  static const _backgroundPermissionsGuideVersion = '2026-07-28.1';
 
   late final AnimationController _motionController;
   late final AnimationController _progressController;
@@ -33,10 +36,13 @@ class _SplashScreenState extends State<SplashScreen>
   String _permissionText = 'سيطلب التطبيق إذن الكاميرا بعد اكتمال التحميل.';
   _CameraPermissionState _cameraState = _CameraPermissionState.waiting;
   bool _hasInitializationError = false;
+  Completer<void>? _externalSettingsResume;
+  bool _externalSettingsPaused = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _motionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 4200),
@@ -54,9 +60,29 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    final externalSettingsResume = _externalSettingsResume;
+    if (externalSettingsResume != null && !externalSettingsResume.isCompleted) {
+      externalSettingsResume.complete();
+    }
     _motionController.dispose();
     _progressController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final completer = _externalSettingsResume;
+    if (completer == null || completer.isCompleted) return;
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _externalSettingsPaused = true;
+      return;
+    }
+    if (state == AppLifecycleState.resumed && _externalSettingsPaused) {
+      completer.complete();
+    }
   }
 
   Future<void> _initialize() async {
@@ -111,7 +137,14 @@ class _SplashScreenState extends State<SplashScreen>
       if (!privacyAccepted) return;
 
       await _updateProgress(
-        0.82,
+        0.76,
+        'تجهيز التنبيهات خارج التطبيق...',
+        'سيتم توضيح صلاحيات الإشعارات والتشغيل في الخلفية قبل طلبها.',
+      );
+      await _ensureBackgroundAlertPermissions(settings);
+
+      await _updateProgress(
+        0.86,
         'تحضير الكاميرا...',
         'سيظهر طلب السماح بالكاميرا لتصوير حالة الجهاز عند الاستلام.',
       );
@@ -132,7 +165,10 @@ class _SplashScreenState extends State<SplashScreen>
       await Future.delayed(const Duration(milliseconds: 780));
 
       if (!mounted) return;
-      context.go(nextRoute);
+      final route = BackgroundAlertService().takePendingOpenNotifications()
+          ? '/notifications'
+          : nextRoute;
+      context.go(route);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -166,6 +202,102 @@ class _SplashScreenState extends State<SplashScreen>
           DateTime.now().millisecondsSinceEpoch.toString(),
     });
     return true;
+  }
+
+  Future<void> _ensureBackgroundAlertPermissions(
+    SettingsService settings,
+  ) async {
+    if (!_supportsBackgroundAlertPermissions) return;
+    final shownVersion =
+        await settings.getSetting('background_permissions_guide_version');
+    if (shownVersion == _backgroundPermissionsGuideVersion || !mounted) return;
+
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _BackgroundPermissionsDialog(),
+    );
+    if (accepted != true || !mounted) return;
+
+    final service = BackgroundAlertService();
+    var status = await service.permissionStatus();
+    if (!status.notificationsGranted) {
+      await _updateProgress(
+        0.78,
+        'طلب إذن الإشعارات...',
+        'اختر السماح ليظهر تنبيه الصيانة أو الضمان والجوال خارج التطبيق.',
+      );
+      await Permission.notification.request();
+      status = await service.permissionStatus();
+    }
+
+    if (!status.exactAlarmsGranted) {
+      await _updateProgress(
+        0.80,
+        'تفعيل التنبيه في موعده...',
+        'فعّل «المنبهات والتذكيرات» لـ ProShop ثم ارجع إلى التطبيق.',
+      );
+      await _openExternalSettings(service.openExactAlarmSettings);
+      status = await service.permissionStatus();
+    }
+
+    if (status.requiresAutoStart) {
+      await _updateProgress(
+        0.82,
+        'تفعيل التشغيل التلقائي...',
+        'في الشاشة التالية فعّل ProShop ليعمل التنبيه بعد إغلاق التطبيق، ثم ارجع.',
+      );
+      await _openExternalSettings(service.openAutoStartSettings);
+      status = await service.permissionStatus();
+    }
+
+    if (!status.batteryOptimizationIgnored) {
+      await _updateProgress(
+        0.84,
+        'السماح بالعمل في الخلفية...',
+        'اختر السماح حتى لا يوقف النظام تنبيهات ProShop عند إغلاق التطبيق.',
+      );
+      await _openExternalSettings(
+        service.requestBatteryOptimizationExemption,
+      );
+    }
+
+    await settings.save({
+      'background_permissions_guide_version':
+          _backgroundPermissionsGuideVersion,
+      'background_permissions_guide_completed_at':
+          DateTime.now().millisecondsSinceEpoch.toString(),
+    });
+    await service.reschedule();
+  }
+
+  Future<void> _openExternalSettings(
+    Future<bool> Function() opener,
+  ) async {
+    _externalSettingsPaused = false;
+    final completer = Completer<void>();
+    _externalSettingsResume = completer;
+    final opened = await opener();
+    if (!opened) {
+      _externalSettingsResume = null;
+      return;
+    }
+    try {
+      await completer.future.timeout(const Duration(minutes: 3));
+    } on TimeoutException {
+      // Continue safely if a vendor settings screen does not report lifecycle
+      // callbacks in the standard order.
+    } finally {
+      if (identical(_externalSettingsResume, completer)) {
+        _externalSettingsResume = null;
+      }
+    }
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  bool get _supportsBackgroundAlertPermissions {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android;
   }
 
   Future<void> _openPrivacyPolicy(String url) async {
@@ -547,6 +679,152 @@ class _LoadingPanel extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(delay: 380.ms, duration: 520.ms).slideY(begin: .18);
+  }
+}
+
+class _BackgroundPermissionsDialog extends StatelessWidget {
+  const _BackgroundPermissionsDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: Row(
+          children: [
+            const Icon(
+              Icons.notifications_active_rounded,
+              color: Color(0xFF0FAE78),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'تشغيل جميع خصائص ProShop',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'يحتاج التطبيق إلى الصلاحيات التالية حتى تعمل التنبيهات أثناء استخدام التطبيق وبعد إغلاقه:',
+                  style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.w700,
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const _BackgroundPermissionRow(
+                  icon: Icons.notifications_rounded,
+                  title: 'الإشعارات',
+                  reason:
+                      'لعرض تنبيه الصيانة المتأخرة والضمان المنتهي أو القريب من الانتهاء.',
+                ),
+                const _BackgroundPermissionRow(
+                  icon: Icons.alarm_rounded,
+                  title: 'المنبهات والتذكيرات',
+                  reason: 'لإطلاق التنبيه في موعده دون تأخير من النظام.',
+                ),
+                const _BackgroundPermissionRow(
+                  icon: Icons.restart_alt_rounded,
+                  title: 'التشغيل التلقائي',
+                  reason:
+                      'ليبدأ نظام التنبيهات من جديد بعد إغلاق التطبيق أو إعادة تشغيل الجوال.',
+                ),
+                const _BackgroundPermissionRow(
+                  icon: Icons.battery_saver_rounded,
+                  title: 'العمل في الخلفية',
+                  reason:
+                      'لمنع توفير البطارية من إيقاف تنبيهات ProShop والتطبيق مغلق.',
+                ),
+                const _BackgroundPermissionRow(
+                  icon: Icons.photo_camera_rounded,
+                  title: 'الكاميرا',
+                  reason:
+                      'لتصوير حالة جهاز العميل عند الاستلام وإنشاء التقرير المصور.',
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'ستفتح إعدادات الجهاز المطلوبة بالتتابع. فعّل ProShop في شاشة التشغيل التلقائي ثم ارجع لإكمال التشغيل.',
+                  style: GoogleFonts.cairo(
+                    color: const Color(0xFF0A7E59),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.check_rounded),
+            label: Text(
+              'السماح والمتابعة',
+              style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BackgroundPermissionRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String reason;
+
+  const _BackgroundPermissionRow({
+    required this.icon,
+    required this.title,
+    required this.reason,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0FAE78).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: const Color(0xFF0A7E59), size: 21),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+                ),
+                Text(
+                  reason,
+                  style: GoogleFonts.cairo(fontSize: 12, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

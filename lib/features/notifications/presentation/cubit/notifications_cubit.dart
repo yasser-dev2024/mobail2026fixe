@@ -32,6 +32,42 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     } catch (_) {}
   }
 
+  Future<void> snooze(
+    String id, {
+    required int until,
+    bool? unreadOnly,
+  }) async {
+    try {
+      await _repo.snooze(id, until: until);
+      await loadNotifications(unreadOnly: unreadOnly);
+    } catch (_) {}
+  }
+
+  Future<void> snoozeMany(
+    Iterable<String> ids, {
+    required int until,
+    bool? unreadOnly,
+  }) async {
+    try {
+      await _repo.snoozeMany(ids, until: until);
+      await loadNotifications(unreadOnly: unreadOnly);
+    } catch (_) {}
+  }
+
+  Future<void> resumeAlert(String id, {bool? unreadOnly}) async {
+    try {
+      await _repo.resumeAlert(id);
+      await loadNotifications(unreadOnly: unreadOnly);
+    } catch (_) {}
+  }
+
+  Future<void> stopAlert(String id, {bool? unreadOnly}) async {
+    try {
+      await _repo.stopAlert(id);
+      await loadNotifications(unreadOnly: unreadOnly);
+    } catch (_) {}
+  }
+
   Future<void> delete(String id) async {
     try {
       await _repo.delete(id);

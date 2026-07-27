@@ -2,6 +2,9 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/services/alert_sound_service.dart';
+import '../../../core/services/background_alert_service.dart';
+import '../../../core/services/settings_service.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../warranty/data/warranty_repository.dart';
 import '../../whatsapp/data/whatsapp_repository.dart';
 import 'notification_model.dart';
@@ -57,6 +60,7 @@ class NotificationsRepository {
       'UPDATE notifications SET is_read = 1 WHERE shop_id = ? AND id = ?',
       [shopId, id],
     );
+    await _syncBackgroundAlerts();
   }
 
   /// Mark every notification as read.
@@ -66,6 +70,7 @@ class NotificationsRepository {
       'UPDATE notifications SET is_read = 1 WHERE shop_id = ? AND is_read = 0',
       [shopId],
     );
+    await _syncBackgroundAlerts();
   }
 
   /// Hard-delete a notification by [id].
@@ -75,6 +80,7 @@ class NotificationsRepository {
       'DELETE FROM notifications WHERE shop_id = ? AND id = ?',
       [shopId, id],
     );
+    await _syncBackgroundAlerts();
   }
 
   /// Insert a new notification.
@@ -84,6 +90,7 @@ class NotificationsRepository {
       'notifications',
       notification.copyWith(shopId: shopId).toMap(),
     );
+    await _syncBackgroundAlerts();
   }
 
   Future<void> addDeviceNotification({
@@ -116,6 +123,193 @@ class NotificationsRepository {
       orderBy: 'created_at DESC',
     );
     return rows.map(NotificationModel.fromMap).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Recurring alert engine (snooze / stop / re-fire)
+  // ---------------------------------------------------------------------------
+
+  /// Unread, non-stopped notifications that are due to re-fire (sound +
+  /// popup) right now: their snooze (if any) has passed, and it has been at
+  /// least [SettingsService.alertCheckIntervalMinutes] since they last fired
+  /// (or they have never fired). Fully generic — applies to every existing
+  /// and future notification `type` with no per-type code needed here.
+  Future<List<NotificationModel>> getDueForRefire() async {
+    final shopId = await _db.getCurrentShopId();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final intervalMs = SettingsService().alertCheckIntervalMinutes * 60000;
+    final rows = await _db.rawQuery(
+      '''SELECT * FROM notifications
+         WHERE shop_id = ?
+           AND is_read = 0
+           AND alert_stopped = 0
+           AND (snoozed_until IS NULL OR snoozed_until <= ?)
+           AND (last_fired_at IS NULL OR last_fired_at <= ?)
+         ORDER BY created_at ASC''',
+      [shopId, now, now - intervalMs],
+    );
+    return rows.map(NotificationModel.fromMap).toList();
+  }
+
+  /// Snoozes a single alert until [until] (epoch ms) — it will not re-fire
+  /// before that time, but is not marked read/stopped, so it resumes
+  /// re-firing on the normal interval afterwards.
+  Future<void> snooze(String id, {required int until}) async {
+    final shopId = await _db.getCurrentShopId();
+    await _db.rawUpdate(
+      'UPDATE notifications SET snoozed_until = ? WHERE shop_id = ? AND id = ?',
+      [until, shopId, id],
+    );
+    await _syncBackgroundAlerts();
+  }
+
+  /// Snoozes a selected group in one database update. This is used by the
+  /// combined popup so a queue of due alerts never has to be dismissed one by
+  /// one.
+  Future<void> snoozeMany(
+    Iterable<String> ids, {
+    required int until,
+  }) async {
+    final uniqueIds = ids.where((id) => id.trim().isNotEmpty).toSet().toList();
+    if (uniqueIds.isEmpty) return;
+    final shopId = await _db.getCurrentShopId();
+    final placeholders = List.filled(uniqueIds.length, '?').join(', ');
+    await _db.rawUpdate(
+      'UPDATE notifications SET snoozed_until = ? '
+      'WHERE shop_id = ? AND id IN ($placeholders)',
+      [until, shopId, ...uniqueIds],
+    );
+    await _syncBackgroundAlerts();
+  }
+
+  /// Re-enables a stopped or snoozed alert immediately so it can be managed
+  /// again from the notifications screen.
+  Future<void> resumeAlert(String id) async {
+    final shopId = await _db.getCurrentShopId();
+    await _db.rawUpdate(
+      '''UPDATE notifications
+         SET snoozed_until = NULL,
+             alert_stopped = 0,
+             alert_stopped_at = NULL,
+             alert_stopped_by = NULL,
+             last_fired_at = NULL,
+             is_read = 0
+         WHERE shop_id = ? AND id = ?''',
+      [shopId, id],
+    );
+    await _syncBackgroundAlerts();
+  }
+
+  /// Permanently stops a single alert from re-firing. Device-stay alerts
+  /// have exactly one row per ticket, so this means "never again for this
+  /// ticket." Warranty alerts get a fresh `type` string (and therefore a
+  /// fresh row) as the day-bucket changes, so stopping e.g.
+  /// `warranty_expiring_tomorrow` does not block a later, distinct
+  /// `warranty_expired` row from firing — that already falls out of the
+  /// existing dedup-by-(reference_id, type) design with no extra code.
+  Future<void> stopAlert(String id) async {
+    final shopId = await _db.getCurrentShopId();
+    final user = AuthRepository().getCurrentUser();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _db.rawUpdate(
+      '''UPDATE notifications
+         SET alert_stopped = 1, alert_stopped_at = ?, alert_stopped_by = ?, is_read = 1
+         WHERE shop_id = ? AND id = ?''',
+      [now, user?.username ?? user?.name ?? 'النظام', shopId, id],
+    );
+    await _syncBackgroundAlerts();
+  }
+
+  /// Records that an alert was just (re-)shown, so the recurrence interval
+  /// is measured from this moment.
+  Future<void> markFired(String id) async {
+    final shopId = await _db.getCurrentShopId();
+    await _db.rawUpdate(
+      'UPDATE notifications SET last_fired_at = ? WHERE shop_id = ? AND id = ?',
+      [DateTime.now().millisecondsSinceEpoch, shopId, id],
+    );
+    await _syncBackgroundAlerts();
+  }
+
+  /// Records one firing time for every alert displayed in the combined popup.
+  Future<void> markFiredMany(Iterable<String> ids) async {
+    final uniqueIds = ids.where((id) => id.trim().isNotEmpty).toSet().toList();
+    if (uniqueIds.isEmpty) return;
+    final shopId = await _db.getCurrentShopId();
+    final placeholders = List.filled(uniqueIds.length, '?').join(', ');
+    await _db.rawUpdate(
+      'UPDATE notifications SET last_fired_at = ? '
+      'WHERE shop_id = ? AND id IN ($placeholders)',
+      [
+        DateTime.now().millisecondsSinceEpoch,
+        shopId,
+        ...uniqueIds,
+      ],
+    );
+    await _syncBackgroundAlerts();
+  }
+
+  /// Loads the customer/device/ticket context needed by the recurring alert
+  /// popup for a single notification, regardless of its `reference_type`.
+  Future<AlertPopupDetails?> getAlertDetails(String notificationId) async {
+    final shopId = await _db.getCurrentShopId();
+    final notifRows = await _db.query(
+      'notifications',
+      where: 'shop_id = ? AND id = ?',
+      whereArgs: [shopId, notificationId],
+      limit: 1,
+    );
+    if (notifRows.isEmpty) return null;
+    final notif = NotificationModel.fromMap(notifRows.first);
+
+    if (notif.referenceType != 'maintenance' &&
+        notif.referenceType != 'warranty') {
+      return AlertPopupDetails(notification: notif);
+    }
+
+    final maintenanceId = notif.referenceType == 'warranty'
+        ? await _maintenanceIdForWarranty(notif.referenceId, shopId)
+        : notif.referenceId;
+    if (maintenanceId == null) return AlertPopupDetails(notification: notif);
+
+    final rows = await _db.rawQuery(
+      '''SELECT m.ticket_number, m.brand, m.model, m.received_at,
+                c.name AS customer_name, c.phone AS customer_phone
+         FROM maintenance m
+         LEFT JOIN customers c ON m.customer_id = c.id AND c.shop_id = m.shop_id
+         WHERE m.shop_id = ? AND m.id = ?
+         LIMIT 1''',
+      [shopId, maintenanceId],
+    );
+    if (rows.isEmpty) return AlertPopupDetails(notification: notif);
+    final row = rows.first;
+    return AlertPopupDetails(
+      notification: notif,
+      customerName: row['customer_name'] as String?,
+      customerPhone: row['customer_phone'] as String?,
+      deviceName: [row['brand'], row['model']]
+          .whereType<String>()
+          .where((v) => v.trim().isNotEmpty)
+          .join(' '),
+      ticketNumber: row['ticket_number'] as String?,
+      maintenanceId: maintenanceId,
+    );
+  }
+
+  Future<String?> _maintenanceIdForWarranty(
+    String? warrantyId,
+    String shopId,
+  ) async {
+    if (warrantyId == null) return null;
+    final rows = await _db.query(
+      'warranties',
+      columns: ['maintenance_id'],
+      where: 'shop_id = ? AND id = ?',
+      whereArgs: [shopId, warrantyId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['maintenance_id'] as String?;
   }
 
   // ---------------------------------------------------------------------------
@@ -186,7 +380,11 @@ class NotificationsRepository {
     return true;
   }
 
-  /// Check for maintenance tickets that stayed in the shop for 2+ days.
+  /// Check for maintenance tickets that exceeded their estimated delivery
+  /// date. Re-fires daily (the `type` includes the day) — combined with
+  /// [AlertMonitorService]'s generic snooze/stop engine, a specific day's
+  /// alert can still be individually snoozed/stopped without suppressing the
+  /// next day's.
   Future<int> _checkDevicesStayingTwoDays() async {
     final now = DateTime.now();
     final cutoff = now.millisecondsSinceEpoch;
@@ -411,5 +609,10 @@ class NotificationsRepository {
       'DELETE FROM notifications WHERE shop_id = ? AND is_read = 1 AND created_at < ?',
       [shopId, cutoff],
     );
+    await _syncBackgroundAlerts();
+  }
+
+  Future<void> _syncBackgroundAlerts() async {
+    await BackgroundAlertService().reschedule();
   }
 }

@@ -274,8 +274,9 @@ class InvoiceRepository {
         !File(pdfPath).existsSync()) {
       throw Exception('ملف PDF غير موجود. أعد إنشاء الفاتورة أولاً.');
     }
-    final phone = invoice.customerPhone.trim();
-    if (!_isValidPhone(phone)) {
+    final phone = await _resolveCustomerPhone(invoice);
+    final normalizedPhone = DocumentShareService.normalizeWhatsAppPhone(phone);
+    if (!_isValidPhone(normalizedPhone)) {
       throw Exception('رقم الجوال غير صالح للإرسال.');
     }
 
@@ -289,13 +290,14 @@ class InvoiceRepository {
     ].join('\n');
     final ok = await DocumentShareService.sharePdfToWhatsApp(
       filePath: pdfPath,
-      phone: phone,
+      phone: normalizedPhone,
       message: message,
     );
     await markSent(
       invoiceId,
       method: 'whatsapp',
       status: ok ? 'sent' : 'failed',
+      recipientPhone: normalizedPhone,
       errorMessage: ok ? null : 'تعذر فتح واتساب أو مشاركة ملف PDF.',
     );
     return ok;
@@ -305,6 +307,7 @@ class InvoiceRepository {
     String invoiceId, {
     required String method,
     required String status,
+    String? recipientPhone,
     String? errorMessage,
   }) async {
     final invoice = await getById(invoiceId);
@@ -323,7 +326,7 @@ class InvoiceRepository {
       'document_id': invoiceId,
       'document_type': 'invoice',
       'customer_id': invoice.customerId,
-      'phone': invoice.customerPhone,
+      'phone': recipientPhone ?? invoice.customerPhone,
       'method': method,
       'file_path': invoice.pdfPath,
       'status': status,
@@ -331,6 +334,26 @@ class InvoiceRepository {
       'sent_by': AuthRepository().getCurrentUser()?.username ?? 'النظام',
       'sent_at': now,
     });
+  }
+
+  Future<String> _resolveCustomerPhone(InvoiceModel invoice) async {
+    final shopId = await _db.getCurrentShopId();
+    final rows = await _db.query(
+      'customers',
+      columns: const ['phone'],
+      where: 'id = ? AND shop_id = ? AND deleted_at IS NULL',
+      whereArgs: [invoice.customerId, shopId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw Exception('سجل عميل الفاتورة غير موجود.');
+    }
+
+    final phone = rows.first['phone']?.toString().trim() ?? '';
+    if (phone.isEmpty) {
+      throw Exception('لا يوجد رقم جوال في سجل عميل الفاتورة.');
+    }
+    return phone;
   }
 
   Future<void> refreshWarrantyStatuses() async {
@@ -544,7 +567,7 @@ ORDER BY created_at ASC
 
   bool _isValidPhone(String phone) {
     final clean = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    return clean.length >= 9 && clean.length <= 15;
+    return clean.length >= 9 && clean.length <= 15 && !clean.startsWith('0');
   }
 
   String _firstNotEmpty(List<String> values) {
