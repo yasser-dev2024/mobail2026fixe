@@ -57,3 +57,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Download website build outputs
+/node_modules/
+/.next/
+/.open-next/
+/out/
+/maintenance-assistant-site.tar.gz
