@@ -64,3 +64,4 @@ app.*.map.json
 /.open-next/
 /out/
 /maintenance-assistant-site.tar.gz
+/next-env.d.ts
