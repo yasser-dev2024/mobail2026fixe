@@ -7,8 +7,10 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/hijri_date.dart';
+import '../../../repair_board/data/repair_board_repository.dart';
 import '../../data/warranty_model.dart';
 import '../cubit/warranty_cubit.dart';
+import '../widgets/warranty_return_dialog.dart';
 
 class WarrantyScreen extends StatefulWidget {
   const WarrantyScreen({super.key});
@@ -28,6 +30,7 @@ class _WarrantyScreenState extends State<WarrantyScreen>
   String _nameQuery = '';
   String _phoneQuery = '';
   String _recordQuery = '';
+  String? _receivingWarrantyId;
 
   static const _tabs = [
     _TabDef('الكل', null),
@@ -57,6 +60,50 @@ class _WarrantyScreenState extends State<WarrantyScreen>
     _phoneSearchController.dispose();
     _recordSearchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _receiveUnderWarranty(WarrantyModel warranty) async {
+    final payload = await showWarrantyReturnDialog(
+      context: context,
+      warranty: warranty,
+    );
+    if (payload == null || !mounted) return;
+
+    setState(() => _receivingWarrantyId = warranty.id);
+    try {
+      await RepairBoardRepository().receiveUnderWarranty(
+        warranty: warranty,
+        problem: payload.problem,
+        customerDescription: payload.customerDescription,
+        deviceCondition: payload.deviceCondition,
+        employeeNotes: payload.employeeNotes,
+        imagePaths: payload.imagePaths,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تم استلام الجوال تحت الضمان وظهر في سجل الصيانة.',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.w700),
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      await _cubit.loadAll(status: _tabs[_tabController.index].status);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('Exception: ', ''),
+            style: GoogleFonts.cairo(),
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _receivingWarrantyId = null);
+    }
   }
 
   @override
@@ -352,6 +399,8 @@ class _WarrantyScreenState extends State<WarrantyScreen>
         child: _WarrantyTable(
           items: items,
           totalCount: durationItems.length,
+          receivingWarrantyId: _receivingWarrantyId,
+          onReceiveUnderWarranty: _receiveUnderWarranty,
         ),
       );
     }
@@ -491,10 +540,14 @@ class _EmptyWarrantySearch extends StatelessWidget {
 class _WarrantyTable extends StatefulWidget {
   final List<WarrantyModel> items;
   final int totalCount;
+  final String? receivingWarrantyId;
+  final ValueChanged<WarrantyModel> onReceiveUnderWarranty;
 
   const _WarrantyTable({
     required this.items,
     required this.totalCount,
+    required this.receivingWarrantyId,
+    required this.onReceiveUnderWarranty,
   });
 
   @override
@@ -517,8 +570,42 @@ class _WarrantyTableState extends State<_WarrantyTable> {
     final colors = context.appColors;
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (constraints.maxWidth < 760) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: Text(
+                  widget.items.length == widget.totalCount
+                      ? '${widget.items.length} ضمان'
+                      : 'عرض ${widget.items.length} من ${widget.totalCount} ضمان',
+                  style: GoogleFonts.cairo(
+                    color: colors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: _verticalController,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  itemCount: widget.items.length,
+                  itemBuilder: (context, index) => _WarrantyCard(
+                    warranty: widget.items[index],
+                    receiving:
+                        widget.receivingWarrantyId == widget.items[index].id,
+                    onReceiveUnderWarranty: widget.onReceiveUnderWarranty,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
         final tableWidth =
-            constraints.maxWidth < 1080 ? 1080.0 : constraints.maxWidth;
+            constraints.maxWidth < 1280 ? 1280.0 : constraints.maxWidth;
         return DecoratedBox(
           decoration: BoxDecoration(
             color: colors.card,
@@ -574,6 +661,10 @@ class _WarrantyTableState extends State<_WarrantyTable> {
                                     _WarrantyTableRow(
                                   warranty: widget.items[index],
                                   shaded: index.isOdd,
+                                  receiving: widget.receivingWarrantyId ==
+                                      widget.items[index].id,
+                                  onReceiveUnderWarranty:
+                                      widget.onReceiveUnderWarranty,
                                 ),
                               ),
                             ),
@@ -611,7 +702,10 @@ class _WarrantyTableHeader extends StatelessWidget {
           _WarrantyCell(text: 'المدة', flex: 2, header: true),
           _WarrantyCell(text: 'تاريخ الانتهاء', flex: 2, header: true),
           _WarrantyCell(text: 'المتبقي', flex: 2, header: true),
-          SizedBox(width: 38),
+          SizedBox(
+            width: 188,
+            child: Center(child: Text('الإجراء')),
+          ),
         ],
       ),
     );
@@ -621,10 +715,14 @@ class _WarrantyTableHeader extends StatelessWidget {
 class _WarrantyTableRow extends StatelessWidget {
   final WarrantyModel warranty;
   final bool shaded;
+  final bool receiving;
+  final ValueChanged<WarrantyModel> onReceiveUnderWarranty;
 
   const _WarrantyTableRow({
     required this.warranty,
     required this.shaded,
+    required this.receiving,
+    required this.onReceiveUnderWarranty,
   });
 
   @override
@@ -716,11 +814,13 @@ class _WarrantyTableRow extends StatelessWidget {
                     color: statusColor,
                     weight: FontWeight.w800,
                   ),
-                  const SizedBox(
-                    width: 38,
-                    child: Icon(
-                      Icons.chevron_left_rounded,
-                      color: AppColors.primary,
+                  SizedBox(
+                    width: 188,
+                    child: WarrantyReturnButton(
+                      warranty: warranty,
+                      compact: true,
+                      loading: receiving,
+                      onPressed: () => onReceiveUnderWarranty(warranty),
                     ),
                   ),
                 ],
@@ -842,12 +942,16 @@ class _StatCard extends StatelessWidget {
 // Warranty card
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Kept temporarily for backwards-compatible visual reference while the new
-// tablet-friendly circular grid is rolled out.
-// ignore: unused_element
 class _WarrantyCard extends StatelessWidget {
   final WarrantyModel warranty;
-  const _WarrantyCard({required this.warranty});
+  final bool receiving;
+  final ValueChanged<WarrantyModel> onReceiveUnderWarranty;
+
+  const _WarrantyCard({
+    required this.warranty,
+    required this.receiving,
+    required this.onReceiveUnderWarranty,
+  });
 
   Color _statusColor(String s) {
     switch (s) {
@@ -983,6 +1087,14 @@ class _WarrantyCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (canReceiveDeviceUnderWarranty(warranty)) ...[
+                const SizedBox(height: 14),
+                WarrantyReturnButton(
+                  warranty: warranty,
+                  loading: receiving,
+                  onPressed: () => onReceiveUnderWarranty(warranty),
+                ),
+              ],
             ],
           ),
         ),

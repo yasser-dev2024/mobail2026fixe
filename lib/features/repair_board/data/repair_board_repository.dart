@@ -366,6 +366,19 @@ ORDER BY
       throw Exception('اكتب المشكلة الحالية.');
     }
 
+    final currentMaintenance =
+        await _maintenanceRepo.getById(warranty.maintenanceId);
+    if (currentMaintenance == null) {
+      throw Exception('تعذر العثور على سجل صيانة هذا الضمان.');
+    }
+    if (currentMaintenance.status != AppConstants.statusDelivered) {
+      throw Exception(
+        currentMaintenance.status == AppConstants.statusWarrantyReturn
+            ? 'تم استلام هذا الجوال تحت الضمان بالفعل.'
+            : 'الجوال موجود حالياً في مسار الصيانة ولا يمكن استلامه مرة أخرى.',
+      );
+    }
+
     final description = [
       cleanProblem,
       if ((customerDescription ?? '').trim().isNotEmpty)
