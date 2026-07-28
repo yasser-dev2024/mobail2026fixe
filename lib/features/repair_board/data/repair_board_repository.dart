@@ -548,14 +548,23 @@ LIMIT 1
     }
 
     final imei = data.imei.trim();
-    if (imei.isNotEmpty) {
-      final existing = await _devicesRepo.searchByImei(imei);
-      if (existing != null) {
-        if (existing.customerId != customerId) {
-          throw Exception('رقم IMEI مسجل لعميل آخر.');
-        }
-        return existing;
+    final serial = data.serial.trim();
+    final color = data.color.trim();
+    final existing = await _devicesRepo.findMatchingDevice(
+      customerId: customerId,
+      brand: data.brandOrType,
+      model: data.model.trim(),
+      imei: imei.isEmpty ? null : imei,
+      serialNumber: serial.isEmpty ? null : serial,
+      color: color.isEmpty ? null : color,
+    );
+    if (existing != null) {
+      if (existing.customerId != customerId) {
+        throw Exception(
+          'هذا الجوال مسجل لعميل آخر. راجع رقم IMEI أو الرقم التسلسلي.',
+        );
       }
+      return existing;
     }
 
     final device = DeviceModel.create(
@@ -563,14 +572,16 @@ LIMIT 1
       brand: data.brandOrType,
       model: data.model.trim(),
       imei: imei.isEmpty ? null : imei,
-      serialNumber: data.serial.trim().isEmpty ? null : data.serial.trim(),
-      color: data.color.trim().isEmpty ? null : data.color.trim(),
+      serialNumber: serial.isEmpty ? null : serial,
+      color: color.isEmpty ? null : color,
       notes: data.deviceType.trim().isEmpty
           ? null
           : 'نوع الجهاز: ${data.deviceType.trim()}',
     );
-    await _devicesRepo.create(device);
-    return device;
+    final savedId = await _devicesRepo.create(device);
+    return savedId == device.id
+        ? device
+        : (await _devicesRepo.getById(savedId))!;
   }
 
   Future<List<String>> _loadPartNames(String maintenanceId) async {

@@ -1,4 +1,5 @@
 import '../../../core/database/database_service.dart';
+import 'device_identity.dart';
 import 'device_model.dart';
 
 class DevicesRepository {
@@ -32,15 +33,63 @@ class DevicesRepository {
   }
 
   Future<String> create(DeviceModel device) async {
+    final existing = await findMatchingDevice(
+      customerId: device.customerId,
+      brand: device.brand,
+      model: device.model,
+      imei: device.imei,
+      serialNumber: device.serialNumber,
+      color: device.color,
+    );
+    if (existing != null) {
+      if (existing.customerId != device.customerId) {
+        throw Exception(
+          'هذا الجوال مسجل لعميل آخر. راجع رقم IMEI أو الرقم التسلسلي.',
+        );
+      }
+      return existing.id;
+    }
+
     final shopId = await _db.getCurrentShopId();
-    final id = await _db.insert('devices', {
-      ...device.toMap(),
-      'shop_id': shopId,
-    });
-    return id ?? device.id;
+    try {
+      final id = await _db.insert('devices', {
+        ...device.toMap(),
+        'shop_id': shopId,
+      });
+      return id ?? device.id;
+    } catch (error) {
+      if (!error.toString().contains('DUPLICATE_DEVICE')) rethrow;
+      final raced = await findMatchingDevice(
+        customerId: device.customerId,
+        brand: device.brand,
+        model: device.model,
+        imei: device.imei,
+        serialNumber: device.serialNumber,
+        color: device.color,
+      );
+      if (raced == null || raced.customerId != device.customerId) rethrow;
+      return raced.id;
+    }
   }
 
   Future<void> update(DeviceModel device) async {
+    final duplicate = await findMatchingDevice(
+      customerId: device.customerId,
+      brand: device.brand,
+      model: device.model,
+      imei: device.imei,
+      serialNumber: device.serialNumber,
+      color: device.color,
+      excludingDeviceId: device.id,
+    );
+    if (duplicate != null) {
+      throw Exception(
+        duplicate.customerId == device.customerId
+            ? 'هذا الجوال مسجل مسبقاً في ملف العميل.'
+            : 'هذا الجوال مسجل لعميل آخر. راجع رقم IMEI أو الرقم التسلسلي.',
+      );
+    }
+
     final shopId = await _db.getCurrentShopId();
     final updated = device.copyWith(
       updatedAt: DateTime.now().millisecondsSinceEpoch,
@@ -76,15 +125,47 @@ class DevicesRepository {
   }
 
   Future<DeviceModel?> searchByImei(String imei) async {
-    final shopId = await _db.getCurrentShopId();
-    final rows = await _db.query(
-      'devices',
-      where: 'shop_id = ? AND imei = ? AND deleted_at IS NULL',
-      whereArgs: [shopId, imei],
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return DeviceModel.fromMap(rows.first);
+    final normalized = normalizeDeviceIdentityPart(imei);
+    if (normalized.isEmpty) return null;
+    final devices = await getAll();
+    for (final device in devices) {
+      if (normalizeDeviceIdentityPart(device.imei) == normalized) {
+        return device;
+      }
+    }
+    return null;
+  }
+
+  Future<DeviceModel?> findMatchingDevice({
+    required String customerId,
+    required String brand,
+    required String model,
+    String? imei,
+    String? serialNumber,
+    String? color,
+    String? excludingDeviceId,
+  }) async {
+    final devices = await getAll();
+    for (final device in devices) {
+      if (device.id == excludingDeviceId) continue;
+      if (isSamePhysicalDevice(
+        firstCustomerId: customerId,
+        firstBrand: brand,
+        firstModel: model,
+        firstImei: imei,
+        firstSerialNumber: serialNumber,
+        firstColor: color,
+        secondCustomerId: device.customerId,
+        secondBrand: device.brand,
+        secondModel: device.model,
+        secondImei: device.imei,
+        secondSerialNumber: device.serialNumber,
+        secondColor: device.color,
+      )) {
+        return device;
+      }
+    }
+    return null;
   }
 
   Future<List<DeviceModel>> getAll({String? search}) async {

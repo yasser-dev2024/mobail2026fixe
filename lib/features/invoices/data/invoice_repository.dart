@@ -297,13 +297,19 @@ class InvoiceRepository {
   }
 
   Future<bool> sendWhatsApp(String invoiceId) async {
-    final invoice = await getById(invoiceId);
+    var invoice = await getById(invoiceId);
     if (invoice == null) throw Exception('الفاتورة غير موجودة.');
-    final pdfPath = invoice.pdfPath;
+    var pdfPath = invoice.pdfPath;
     if (pdfPath == null ||
         pdfPath.trim().isEmpty ||
         !File(pdfPath).existsSync()) {
-      throw Exception('ملف PDF غير موجود. أعد إنشاء الفاتورة أولاً.');
+      invoice = await createOrRegenerateForMaintenance(invoice.maintenanceId);
+      pdfPath = invoice.pdfPath;
+    }
+    if (pdfPath == null ||
+        pdfPath.trim().isEmpty ||
+        !File(pdfPath).existsSync()) {
+      throw Exception('تعذر إعادة إنشاء ملف PDF للفاتورة.');
     }
     final phone = await _resolveCustomerPhone(invoice);
     final normalizedPhone = DocumentShareService.normalizeWhatsAppPhone(phone);
@@ -327,7 +333,7 @@ class InvoiceRepository {
     await markSent(
       invoiceId,
       method: 'whatsapp',
-      status: ok ? 'sent' : 'failed',
+      status: ok ? 'opened' : 'failed',
       recipientPhone: normalizedPhone,
       errorMessage: ok ? null : 'تعذر فتح واتساب أو مشاركة ملف PDF.',
     );

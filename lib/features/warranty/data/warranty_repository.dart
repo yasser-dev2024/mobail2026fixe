@@ -8,6 +8,7 @@ import 'warranty_claim_model.dart';
 
 class WarrantyRepository {
   final DatabaseService _db = DatabaseService();
+  static const String _supersededReason = 'استبدل بضمان أحدث لنفس الجوال';
 
   // ---------------------------------------------------------------------------
   // LIST
@@ -171,6 +172,7 @@ LIMIT 1
       action: 'created',
       newValue: '${warranty.warrantyDays} يوم',
     );
+    await archiveSupersededForMaintenance(warranty.maintenanceId);
     return id;
   }
 
@@ -208,6 +210,100 @@ LIMIT 1
         warranty.id,
       ],
     );
+    await archiveSupersededForMaintenance(warranty.maintenanceId);
+  }
+
+  Future<void> archiveSupersededForMaintenance(
+    String maintenanceId,
+  ) async {
+    final shopId = await _db.getCurrentShopId();
+    final rows = await _db.rawQuery(
+      '''
+SELECT device_id
+FROM maintenance
+WHERE shop_id = ? AND id = ? AND device_id IS NOT NULL
+LIMIT 1
+''',
+      [shopId, maintenanceId],
+    );
+    if (rows.isEmpty) return;
+    await archiveSupersededForDevice(rows.first['device_id'] as String?);
+  }
+
+  Future<void> archiveSupersededForDevice(String? deviceId) async {
+    if (deviceId == null || deviceId.trim().isEmpty) return;
+    final shopId = await _db.getCurrentShopId();
+    final warranties = await _db.rawQuery(
+      '''
+SELECT w.id, w.maintenance_id
+FROM warranties w
+JOIN maintenance m
+  ON m.id = w.maintenance_id AND m.shop_id = w.shop_id
+WHERE w.shop_id = ?
+  AND m.device_id = ?
+  AND w.is_void = 0
+ORDER BY w.start_date DESC, w.created_at DESC, w.id DESC
+''',
+      [shopId, deviceId],
+    );
+    if (warranties.length < 2) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final warranty in warranties.skip(1)) {
+      final warrantyId = warranty['id'] as String;
+      final changed = await _db.rawUpdate(
+        '''
+UPDATE warranties
+SET is_void = 1,
+    alert_disabled = 1,
+    alert_disabled_reason = ?,
+    alert_disabled_at = COALESCE(alert_disabled_at, ?),
+    alert_disabled_by = COALESCE(alert_disabled_by, 'النظام'),
+    updated_at = ?
+WHERE shop_id = ? AND id = ? AND is_void = 0
+''',
+        [_supersededReason, now, now, shopId, warrantyId],
+      );
+      if (changed == 0) continue;
+      await _db.rawUpdate(
+        '''
+UPDATE notifications
+SET is_read = 1,
+    alert_stopped = 1,
+    alert_stopped_at = COALESCE(alert_stopped_at, ?),
+    alert_stopped_by = COALESCE(alert_stopped_by, 'النظام')
+WHERE shop_id = ?
+  AND reference_type = 'warranty'
+  AND reference_id = ?
+''',
+        [now, shopId, warrantyId],
+      );
+      await recordAction(
+        warrantyId: warrantyId,
+        maintenanceId: warranty['maintenance_id'] as String?,
+        action: 'superseded',
+        oldValue: 'active',
+        newValue: 'archived',
+        notes: _supersededReason,
+      );
+    }
+  }
+
+  Future<void> archiveSupersededForShop() async {
+    final shopId = await _db.getCurrentShopId();
+    final devices = await _db.rawQuery(
+      '''
+SELECT DISTINCT m.device_id
+FROM warranties w
+JOIN maintenance m
+  ON m.id = w.maintenance_id AND m.shop_id = w.shop_id
+WHERE w.shop_id = ? AND w.is_void = 0 AND m.device_id IS NOT NULL
+''',
+      [shopId],
+    );
+    for (final device in devices) {
+      await archiveSupersededForDevice(device['device_id'] as String?);
+    }
   }
 
   Future<void> voidWarranty(String id) async {
@@ -555,7 +651,7 @@ WHERE m.shop_id = ?
 
       final existing = await _db.rawQuery(
         '''
-SELECT id, created_at, end_date, alert_disabled, alert_disabled_reason,
+SELECT id, created_at, end_date, is_void, alert_disabled, alert_disabled_reason,
        alert_disabled_at, alert_disabled_by, expiry_approved,
        expiry_approved_at, expiry_approved_by
 FROM warranties
@@ -577,6 +673,9 @@ LIMIT 1
       final preserveExpiryApproved = existing.isNotEmpty &&
           (existing.first['expiry_approved'] as int? ?? 0) == 1 &&
           existingEnd == end;
+      final preserveSuperseded = existing.isNotEmpty &&
+          (existing.first['is_void'] as int? ?? 0) == 1 &&
+          existing.first['alert_disabled_reason'] == _supersededReason;
 
       final data = {
         'id': warrantyId,
@@ -589,7 +688,7 @@ LIMIT 1
         'start_date': start,
         'end_date': end,
         'notes': row['notes'],
-        'is_void': preserveExpiryApproved ? 1 : 0,
+        'is_void': preserveExpiryApproved || preserveSuperseded ? 1 : 0,
         'alert_disabled': preserveAlertDisabled ? 1 : 0,
         'alert_disabled_reason': preserveAlertDisabled
             ? existing.first['alert_disabled_reason']
@@ -621,6 +720,7 @@ LIMIT 1
         await _db.update('warranties', data, warrantyId);
       }
     }
+    await archiveSupersededForShop();
   }
 
   int _warrantyDays(String? type, int? customDays) {

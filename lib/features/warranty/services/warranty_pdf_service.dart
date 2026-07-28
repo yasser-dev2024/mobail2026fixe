@@ -199,6 +199,56 @@ ORDER BY p.created_at ASC
                 pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      alignment: pw.Alignment.centerRight,
+                      decoration: const pw.BoxDecoration(
+                        color: PdfColors.indigo50,
+                        borderRadius:
+                            pw.BorderRadius.all(pw.Radius.circular(8)),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text(
+                            documentTitle,
+                            style: sectionTitle,
+                            textAlign: pw.TextAlign.right,
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Text(
+                            _text(data['ticket_number']),
+                            style: bold,
+                            textAlign: pw.TextAlign.right,
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(width: 12),
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(settings.shopName, style: title),
+                          pw.SizedBox(height: 3),
+                          pw.Text(
+                            [
+                              if (settings.shopPhone.isNotEmpty)
+                                'هاتف: ${settings.shopPhone}',
+                              if (settings.shopPhone2.isNotEmpty)
+                                'هاتف إضافي: ${settings.shopPhone2}',
+                              if (settings.shopAddress.isNotEmpty)
+                                settings.shopAddress,
+                            ].join('   |   '),
+                            style: small,
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(width: 12),
                     if (logo != null)
                       pw.Container(
                         width: 58,
@@ -223,45 +273,6 @@ ORDER BY p.created_at ASC
                         ),
                         child: pw.Text('شعار', style: bold),
                       ),
-                    pw.SizedBox(width: 12),
-                    pw.Expanded(
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(settings.shopName, style: title),
-                          pw.SizedBox(height: 3),
-                          pw.Text(
-                            [
-                              if (settings.shopPhone.isNotEmpty)
-                                'هاتف: ${settings.shopPhone}',
-                              if (settings.shopPhone2.isNotEmpty)
-                                'هاتف إضافي: ${settings.shopPhone2}',
-                              if (settings.shopAddress.isNotEmpty)
-                                settings.shopAddress,
-                            ].join('   |   '),
-                            style: small,
-                          ),
-                        ],
-                      ),
-                    ),
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      decoration: const pw.BoxDecoration(
-                        color: PdfColors.indigo50,
-                        borderRadius:
-                            pw.BorderRadius.all(pw.Radius.circular(8)),
-                      ),
-                      child: pw.Column(
-                        children: [
-                          pw.Text(documentTitle, style: sectionTitle),
-                          pw.SizedBox(height: 3),
-                          pw.Text(_text(data['ticket_number']), style: bold),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
                 pw.SizedBox(height: 10),
@@ -503,15 +514,15 @@ ORDER BY p.created_at ASC
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.6),
       columnWidths: const {
-        0: pw.FixedColumnWidth(120),
-        1: pw.FlexColumnWidth(),
+        0: pw.FlexColumnWidth(),
+        1: pw.FixedColumnWidth(120),
       },
       children: rows
           .map(
             (row) => pw.TableRow(
               children: [
-                _cell(row[0], bold, fill: PdfColors.grey100),
                 _cell(row[1], body),
+                _cell(row[0], bold, fill: PdfColors.grey100),
               ],
             ),
           )
@@ -560,7 +571,14 @@ ORDER BY p.created_at ASC
     return pw.Container(
       color: fill,
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      child: pw.Text(value, style: style),
+      child: pw.Directionality(
+        textDirection: pw.TextDirection.rtl,
+        child: pw.Text(
+          value,
+          style: style,
+          textAlign: pw.TextAlign.right,
+        ),
+      ),
     );
   }
 

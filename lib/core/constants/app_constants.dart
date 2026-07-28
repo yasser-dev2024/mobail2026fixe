@@ -2,7 +2,7 @@ class AppConstants {
   static const String appName = 'مساعد الصيانة';
   static const String appVersion = '1.0.0';
   static const String dbName = 'mobile_shop_pro.db';
-  static const int dbVersion = 11;
+  static const int dbVersion = 12;
 
   // Maintenance Status
   static const String statusNew = 'new';

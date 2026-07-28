@@ -193,7 +193,13 @@ class MainActivity : FlutterActivity() {
 
     private fun sharePdfToWhatsApp(filePath: String, phone: String, message: String): Boolean {
         val file = File(filePath)
-        if (!file.exists() || !file.isFile) return false
+        if (!file.exists() || !file.isFile || file.length() == 0L) return false
+        val hasPdfHeader = FileInputStream(file).use { input ->
+            val header = ByteArray(5)
+            input.read(header) == header.size &&
+                header.contentEquals("%PDF-".toByteArray(Charsets.US_ASCII))
+        }
+        if (!hasPdfHeader) return false
 
         val uri = FileProvider.getUriForFile(
             this,
@@ -204,6 +210,7 @@ class MainActivity : FlutterActivity() {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_TEXT, message)
+            putExtra(Intent.EXTRA_TITLE, file.name)
             clipData = ClipData.newRawUri("invoice_pdf", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -231,22 +238,17 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        val directConversationIntent = Intent(baseIntent).apply {
-            component = ComponentName(whatsappPackage, "com.whatsapp.Conversation")
-        }
-        return try {
-            startActivity(directConversationIntent)
-            true
-        } catch (_: ActivityNotFoundException) {
-            launchPackagedWhatsAppFallback(baseIntent)
-        } catch (_: SecurityException) {
-            launchPackagedWhatsAppFallback(baseIntent)
-        }
-    }
+        val pdfShareHandler = packageManager.resolveActivity(
+            baseIntent,
+            PackageManager.MATCH_DEFAULT_ONLY,
+        ) ?: return false
+        if (pdfShareHandler.activityInfo.packageName != whatsappPackage) return false
 
-    private fun launchPackagedWhatsAppFallback(intent: Intent): Boolean {
         return try {
-            startActivity(intent)
+            // Do not force WhatsApp's text-only Conversation activity. Let
+            // WhatsApp resolve ACTION_SEND application/pdf to its official
+            // external-share picker so EXTRA_STREAM remains attached.
+            startActivity(baseIntent)
             true
         } catch (_: ActivityNotFoundException) {
             false

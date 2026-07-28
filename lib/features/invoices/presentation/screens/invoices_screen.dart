@@ -110,7 +110,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
       final ok = await _repo.sendWhatsApp(invoice.id);
       _snack(
         ok
-            ? 'تم فتح محادثة عميل الفاتورة في واتساب'
+            ? 'تم فتح واتساب وفاتورة PDF مرفقة؛ اضغط إرسال'
             : 'تعذر فتح محادثة العميل في واتساب',
         error: !ok,
       );
@@ -172,6 +172,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                     value: _sentStatus,
                     items: const {
                       'not_sent': 'لم ترسل',
+                      'opened': 'فُتحت بالمرفق',
                       'sent': 'مرسلة',
                       'failed': 'فشل الإرسال',
                     },

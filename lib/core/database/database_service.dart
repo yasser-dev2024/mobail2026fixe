@@ -96,6 +96,7 @@ class DatabaseService {
     await _insertDefaultData(db);
     await _ensureWhatsappMessageTemplateSeeds(db);
     await _ensureLocalShopIdentity(db);
+    await _ensureDeviceLifecycleIntegrity(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -168,6 +169,9 @@ class DatabaseService {
     if (oldVersion < 11) {
       await _ensureAlertRecurrenceSchema(db);
       await _ensureWhatsappMessageTemplateSeeds(db);
+    }
+    if (oldVersion < 12) {
+      await _ensureDeviceLifecycleIntegrity(db);
     }
   }
 
@@ -1288,6 +1292,215 @@ class DatabaseService {
       );
     }
     await batch.commit(noResult: true);
+  }
+
+  Future<void> _ensureDeviceLifecycleIntegrity(Database db) async {
+    await _archiveSupersededDeviceWarranties(db);
+
+    const normalizedNewImei =
+        "lower(replace(replace(replace(replace(replace(replace(replace("
+        "trim(coalesce(NEW.imei, '')), ' ', ''), '-', ''), '_', ''), "
+        "'/', ''), '\\', ''), '.', ''), '+', ''))";
+    const normalizedDeviceImei =
+        "lower(replace(replace(replace(replace(replace(replace(replace("
+        "trim(coalesce(d.imei, '')), ' ', ''), '-', ''), '_', ''), "
+        "'/', ''), '\\', ''), '.', ''), '+', ''))";
+    const normalizedNewSerial =
+        "lower(replace(replace(replace(replace(replace(replace(replace("
+        "trim(coalesce(NEW.serial_number, '')), ' ', ''), '-', ''), '_', ''), "
+        "'/', ''), '\\', ''), '.', ''), '+', ''))";
+    const normalizedDeviceSerial =
+        "lower(replace(replace(replace(replace(replace(replace(replace("
+        "trim(coalesce(d.serial_number, '')), ' ', ''), '-', ''), '_', ''), "
+        "'/', ''), '\\', ''), '.', ''), '+', ''))";
+    const normalizedNewBrand =
+        "lower(replace(trim(coalesce(NEW.brand, '')), ' ', ''))";
+    const normalizedDeviceBrand =
+        "lower(replace(trim(coalesce(d.brand, '')), ' ', ''))";
+    const normalizedNewModel =
+        "lower(replace(trim(coalesce(NEW.model, '')), ' ', ''))";
+    const normalizedDeviceModel =
+        "lower(replace(trim(coalesce(d.model, '')), ' ', ''))";
+    const normalizedNewColor =
+        "lower(replace(trim(coalesce(NEW.color, '')), ' ', ''))";
+    const normalizedDeviceColor =
+        "lower(replace(trim(coalesce(d.color, '')), ' ', ''))";
+
+    const duplicateDeviceCondition = '''
+d.shop_id = NEW.shop_id
+AND d.deleted_at IS NULL
+AND d.id <> NEW.id
+AND (
+  ($normalizedNewImei <> '' AND
+   $normalizedNewImei = $normalizedDeviceImei)
+  OR
+  ($normalizedNewSerial <> '' AND
+   $normalizedNewSerial = $normalizedDeviceSerial)
+  OR
+  (
+    d.customer_id = NEW.customer_id
+    AND $normalizedNewBrand = $normalizedDeviceBrand
+    AND $normalizedNewModel = $normalizedDeviceModel
+    AND $normalizedNewColor = $normalizedDeviceColor
+    AND (
+      ($normalizedNewImei = '' AND $normalizedNewSerial = '')
+      OR
+      ($normalizedDeviceImei = '' AND $normalizedDeviceSerial = '')
+    )
+  )
+)
+''';
+
+    await db.execute('''
+CREATE TRIGGER IF NOT EXISTS trg_devices_no_duplicate_insert_v12
+BEFORE INSERT ON devices
+WHEN NEW.deleted_at IS NULL
+BEGIN
+  SELECT CASE WHEN EXISTS (
+    SELECT 1 FROM devices d WHERE $duplicateDeviceCondition
+  ) THEN RAISE(ABORT, 'DUPLICATE_DEVICE') END;
+END
+''');
+    await db.execute('''
+CREATE TRIGGER IF NOT EXISTS trg_devices_no_duplicate_update_v12
+BEFORE UPDATE OF shop_id, customer_id, brand, model, imei, serial_number,
+                 color, deleted_at ON devices
+WHEN NEW.deleted_at IS NULL
+BEGIN
+  SELECT CASE WHEN EXISTS (
+    SELECT 1 FROM devices d WHERE $duplicateDeviceCondition
+  ) THEN RAISE(ABORT, 'DUPLICATE_DEVICE') END;
+END
+''');
+
+    await db.execute('''
+CREATE TRIGGER IF NOT EXISTS trg_maintenance_one_active_device_insert_v12
+BEFORE INSERT ON maintenance
+WHEN NEW.deleted_at IS NULL
+  AND NEW.device_id IS NOT NULL
+  AND trim(NEW.device_id) <> ''
+BEGIN
+  SELECT CASE WHEN EXISTS (
+    SELECT 1
+    FROM maintenance m
+    WHERE m.shop_id = NEW.shop_id
+      AND m.device_id = NEW.device_id
+      AND m.deleted_at IS NULL
+      AND m.status NOT IN ('delivered', 'cancelled')
+  ) THEN RAISE(ABORT, 'DEVICE_ALREADY_UNDER_MAINTENANCE') END;
+
+  SELECT CASE WHEN EXISTS (
+    SELECT 1
+    FROM warranties w
+    JOIN maintenance wm
+      ON wm.id = w.maintenance_id AND wm.shop_id = w.shop_id
+    WHERE w.shop_id = NEW.shop_id
+      AND wm.device_id = NEW.device_id
+      AND w.is_void = 0
+      AND w.end_date >= (strftime('%s', 'now') * 1000)
+  ) THEN RAISE(ABORT, 'DEVICE_UNDER_WARRANTY') END;
+END
+''');
+    await db.execute('''
+CREATE TRIGGER IF NOT EXISTS trg_maintenance_one_active_device_update_v12
+BEFORE UPDATE OF shop_id, device_id, status, deleted_at ON maintenance
+WHEN NEW.deleted_at IS NULL
+  AND NEW.device_id IS NOT NULL
+  AND trim(NEW.device_id) <> ''
+  AND NEW.status NOT IN ('delivered', 'cancelled')
+BEGIN
+  SELECT CASE WHEN EXISTS (
+    SELECT 1
+    FROM maintenance m
+    WHERE m.shop_id = NEW.shop_id
+      AND m.device_id = NEW.device_id
+      AND m.id <> NEW.id
+      AND m.deleted_at IS NULL
+      AND m.status NOT IN ('delivered', 'cancelled')
+  ) THEN RAISE(ABORT, 'DEVICE_ALREADY_UNDER_MAINTENANCE') END;
+END
+''');
+  }
+
+  Future<void> _archiveSupersededDeviceWarranties(Database db) async {
+    const reason = 'استبدل بضمان أحدث لنفس الجوال';
+    final groups = await db.rawQuery(
+      '''
+SELECT w.shop_id, m.device_id
+FROM warranties w
+JOIN maintenance m
+  ON m.id = w.maintenance_id AND m.shop_id = w.shop_id
+WHERE w.is_void = 0 AND m.device_id IS NOT NULL
+GROUP BY w.shop_id, m.device_id
+HAVING COUNT(*) > 1
+''',
+    );
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final group in groups) {
+      final shopId = group['shop_id'] as String;
+      final deviceId = group['device_id'] as String;
+      final rows = await db.rawQuery(
+        '''
+SELECT w.id, w.maintenance_id
+FROM warranties w
+JOIN maintenance m
+  ON m.id = w.maintenance_id AND m.shop_id = w.shop_id
+WHERE w.shop_id = ? AND m.device_id = ? AND w.is_void = 0
+ORDER BY w.start_date DESC, w.created_at DESC, w.id DESC
+''',
+        [shopId, deviceId],
+      );
+      for (final row in rows.skip(1)) {
+        final warrantyId = row['id'] as String;
+        await db.rawUpdate(
+          '''
+UPDATE warranties
+SET is_void = 1,
+    alert_disabled = 1,
+    alert_disabled_reason = ?,
+    alert_disabled_at = COALESCE(alert_disabled_at, ?),
+    alert_disabled_by = COALESCE(alert_disabled_by, 'النظام'),
+    updated_at = ?
+WHERE shop_id = ? AND id = ?
+''',
+          [reason, now, now, shopId, warrantyId],
+        );
+        await db.rawUpdate(
+          '''
+UPDATE notifications
+SET is_read = 1,
+    alert_stopped = 1,
+    alert_stopped_at = COALESCE(alert_stopped_at, ?),
+    alert_stopped_by = COALESCE(alert_stopped_by, 'النظام')
+WHERE shop_id = ?
+  AND reference_type = 'warranty'
+  AND reference_id = ?
+''',
+          [now, shopId, warrantyId],
+        );
+        try {
+          await db.insert(
+            'warranty_actions',
+            {
+              'id': const Uuid().v4(),
+              'shop_id': shopId,
+              'warranty_id': warrantyId,
+              'maintenance_id': row['maintenance_id'],
+              'action': 'superseded',
+              'old_value': 'active',
+              'new_value': 'archived',
+              'user_id': null,
+              'username': 'النظام',
+              'notes': reason,
+              'created_at': now,
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        } catch (_) {
+          // Very old databases may not have the warranty action table yet.
+        }
+      }
+    }
   }
 
   /// Seeds one inactive-by-default-text `whatsapp_templates` row per

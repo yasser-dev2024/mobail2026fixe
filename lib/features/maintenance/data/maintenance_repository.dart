@@ -4,6 +4,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/database/database_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../invoices/data/invoice_repository.dart';
+import '../../warranty/data/warranty_repository.dart';
 import '../../whatsapp/data/whatsapp_repository.dart';
 import '../../tracking/services/remote_tracking_service.dart';
 import 'maintenance_customer_notification.dart';
@@ -122,6 +123,7 @@ ORDER BY m.created_at DESC
     final shopId = await _db.getCurrentShopId();
     final id = maintenance.id.isNotEmpty ? maintenance.id : const Uuid().v4();
     final normalized = _withWarrantyDates(maintenance.copyWith(id: id));
+    await ensureDeviceAvailableForIntake(normalized.deviceId);
     await _validateStatusTransition(
       id: id,
       oldStatus: null,
@@ -130,7 +132,19 @@ ORDER BY m.created_at DESC
     final data = normalized.toMap();
     data['id'] = id;
     data['shop_id'] = shopId;
-    await _db.insert('maintenance', data);
+    try {
+      await _db.insert('maintenance', data);
+    } catch (error) {
+      final text = error.toString();
+      if (text.contains('DEVICE_ALREADY_UNDER_MAINTENANCE') ||
+          text.contains('DEVICE_UNDER_WARRANTY')) {
+        await ensureDeviceAvailableForIntake(normalized.deviceId);
+        throw Exception(
+          'تعذر إنشاء الطلب لأن لهذا الجوال طلباً نشطاً أو ضماناً سارياً.',
+        );
+      }
+      rethrow;
+    }
     await _recordStatusHistory(
       maintenanceId: id,
       oldStatus: null,
@@ -147,6 +161,65 @@ ORDER BY m.created_at DESC
       await _notifyCustomerForStatus(id, normalized.status);
     }
     return id;
+  }
+
+  Future<void> ensureDeviceAvailableForIntake(String? deviceId) async {
+    if (deviceId == null || deviceId.trim().isEmpty) return;
+    final shopId = await _db.getCurrentShopId();
+    final active = await _db.rawQuery(
+      '''
+SELECT ticket_number
+FROM maintenance
+WHERE shop_id = ?
+  AND device_id = ?
+  AND deleted_at IS NULL
+  AND status NOT IN (?, ?)
+ORDER BY created_at DESC
+LIMIT 1
+''',
+      [
+        shopId,
+        deviceId,
+        AppConstants.statusDelivered,
+        AppConstants.statusCancelled,
+      ],
+    );
+    if (active.isNotEmpty) {
+      final ticket = active.first['ticket_number']?.toString() ?? '';
+      throw Exception(
+        'هذا الجوال لا يزال داخل الصيانة في الطلب $ticket. '
+        'افتح الطلب الموجود بدلاً من تكراره.',
+      );
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final warranty = await _db.rawQuery(
+      '''
+SELECT w.end_date, m.ticket_number
+FROM warranties w
+JOIN maintenance m
+  ON m.id = w.maintenance_id AND m.shop_id = w.shop_id
+WHERE w.shop_id = ?
+  AND m.device_id = ?
+  AND w.is_void = 0
+  AND w.end_date >= ?
+ORDER BY w.start_date DESC, w.created_at DESC
+LIMIT 1
+''',
+      [shopId, deviceId, now],
+    );
+    if (warranty.isNotEmpty) {
+      final end = DateTime.fromMillisecondsSinceEpoch(
+        warranty.first['end_date'] as int,
+      );
+      final date = '${end.year.toString().padLeft(4, '0')}-'
+          '${end.month.toString().padLeft(2, '0')}-'
+          '${end.day.toString().padLeft(2, '0')}';
+      throw Exception(
+        'هذا الجوال خرج وما زال تحت الضمان حتى $date. '
+        'استخدم «استلام الجهاز تحت الضمان» بدلاً من إنشاء طلب جديد.',
+      );
+    }
   }
 
   Future<void> update(MaintenanceModel maintenance) async {
@@ -722,7 +795,7 @@ LIMIT 1
 
     final existing = await _db.rawQuery(
       '''
-      SELECT id, created_at, end_date, alert_disabled, alert_disabled_reason,
+      SELECT id, created_at, end_date, is_void, alert_disabled, alert_disabled_reason,
              alert_disabled_at, alert_disabled_by, expiry_approved,
              expiry_approved_at, expiry_approved_by
       FROM warranties
@@ -743,6 +816,10 @@ LIMIT 1
     final preserveExpiryApproved = existing.isNotEmpty &&
         (existing.first['expiry_approved'] as int? ?? 0) == 1 &&
         existingEnd == maintenance.warrantyEnd;
+    final preserveSuperseded = existing.isNotEmpty &&
+        (existing.first['is_void'] as int? ?? 0) == 1 &&
+        existing.first['alert_disabled_reason'] ==
+            'استبدل بضمان أحدث لنفس الجوال';
     final deviceInfo = [
       maintenance.brand,
       maintenance.model,
@@ -761,7 +838,7 @@ LIMIT 1
       'start_date': maintenance.warrantyStart,
       'end_date': maintenance.warrantyEnd,
       'notes': maintenance.notes,
-      'is_void': preserveExpiryApproved ? 1 : 0,
+      'is_void': preserveExpiryApproved || preserveSuperseded ? 1 : 0,
       'alert_disabled': preserveAlertDisabled ? 1 : 0,
       'alert_disabled_reason': preserveAlertDisabled
           ? existing.first['alert_disabled_reason']
@@ -798,6 +875,7 @@ LIMIT 1
     } else {
       await _db.update('warranties', data, id);
     }
+    await WarrantyRepository().archiveSupersededForDevice(maintenance.deviceId);
   }
 
   // ---------------------------------------------------------------------------

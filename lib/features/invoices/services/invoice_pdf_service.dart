@@ -295,17 +295,32 @@ class InvoicePdfService {
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.center,
           children: [
-            pw.Container(
-              width: 58,
-              height: 58,
-              alignment: pw.Alignment.center,
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.grey300),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-              ),
-              child: logo == null
-                  ? pw.Text('شعار', style: small)
-                  : pw.Image(logo, fit: pw.BoxFit.contain),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'فاتورة صيانة',
+                  style: bold,
+                  textAlign: pw.TextAlign.right,
+                ),
+                pw.Text(
+                  invoice.invoiceNumber,
+                  style: bold,
+                  textAlign: pw.TextAlign.right,
+                ),
+                pw.Text(
+                  PdfArabicUtils.dateTime(invoice.createdAt),
+                  style: small,
+                  textAlign: pw.TextAlign.right,
+                ),
+                pw.SizedBox(height: 4),
+                pw.BarcodeWidget(
+                  barcode: pw.Barcode.qrCode(),
+                  data: invoice.invoiceNumber,
+                  width: 46,
+                  height: 46,
+                ),
+              ],
             ),
             pw.SizedBox(width: 10),
             pw.Expanded(
@@ -344,21 +359,17 @@ class InvoicePdfService {
               ),
             ),
             pw.SizedBox(width: 8),
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Text('فاتورة صيانة', style: bold),
-                pw.Text(invoice.invoiceNumber, style: bold),
-                pw.Text(PdfArabicUtils.dateTime(invoice.createdAt),
-                    style: small),
-                pw.SizedBox(height: 4),
-                pw.BarcodeWidget(
-                  barcode: pw.Barcode.qrCode(),
-                  data: invoice.invoiceNumber,
-                  width: 46,
-                  height: 46,
-                ),
-              ],
+            pw.Container(
+              width: 58,
+              height: 58,
+              alignment: pw.Alignment.center,
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey300),
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+              ),
+              child: logo == null
+                  ? pw.Text('شعار', style: small)
+                  : pw.Image(logo, fit: pw.BoxFit.contain),
             ),
           ],
         ),
@@ -396,15 +407,15 @@ class InvoicePdfService {
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
       columnWidths: const {
-        0: pw.FixedColumnWidth(118),
-        1: pw.FlexColumnWidth(),
+        0: pw.FlexColumnWidth(),
+        1: pw.FixedColumnWidth(118),
       },
       children: rows
           .map(
             (row) => pw.TableRow(
               children: [
-                _cell(row[0], bold, fill: PdfColors.grey100),
                 _cell(row[1], body),
+                _cell(row[0], bold, fill: PdfColors.grey100),
               ],
             ),
           )
@@ -653,7 +664,14 @@ class InvoicePdfService {
     return pw.Container(
       color: fill,
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      child: pw.Text(text, style: style),
+      child: pw.Directionality(
+        textDirection: pw.TextDirection.rtl,
+        child: pw.Text(
+          text,
+          style: style,
+          textAlign: pw.TextAlign.right,
+        ),
+      ),
     );
   }
 
