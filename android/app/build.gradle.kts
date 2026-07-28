@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -19,6 +22,31 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
+    val keystoreProperties = Properties()
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+    val releaseStoreFile =
+        (keystoreProperties["storeFile"] as String?)?.let { file(it) }
+    val hasReleaseSigning =
+        keystorePropertiesFile.exists() &&
+            releaseStoreFile?.exists() == true &&
+            !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
+            !keystoreProperties.getProperty("keyPassword").isNullOrBlank() &&
+            !keystoreProperties.getProperty("keyAlias").isNullOrBlank()
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = releaseStoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.proshop.mobile_shop_pro"
@@ -32,9 +60,14 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // A local production key is used when configured. Fresh clones can
+            // still produce an installable APK without committing any secret.
+            signingConfig =
+                if (hasReleaseSigning) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
         }
     }
 }

@@ -1,0 +1,6 @@
+# انسخ هذا الملف إلى android/key.properties وأدخل بيانات مفتاح التوقيع.
+# لا ترفع key.properties أو ملف JKS إلى Git أو Google Drive.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=CHANGE_ME
+storeFile=C:/secure/path/to/proshop-release.jks

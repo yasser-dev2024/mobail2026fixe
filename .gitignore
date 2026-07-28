@@ -41,6 +41,9 @@ migrate_working_dir/
 
 # Local machine paths
 android/local.properties
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
 macos/Flutter/ephemeral/
 ios/Flutter/ephemeral/
 
