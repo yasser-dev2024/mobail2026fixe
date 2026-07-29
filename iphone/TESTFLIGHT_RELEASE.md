@@ -3,8 +3,10 @@
 مسار الإصدار الحقيقي موجود في:
 [`../.github/workflows/ios-testflight-release.yml`](../.github/workflows/ios-testflight-release.yml).
 
-يعمل يدويًا فقط، ولا يرفع أي ملف ما لم يتم اختيار `confirm_upload=true`. قبل
-تشغيله أنشئ بيئة GitHub باسم `testflight` وأضف الأسرار الآتية داخلها:
+يعمل يدويًا فقط، ولا يرفع أي ملف ما لم يتم اختيار فرع
+`fix-whatsapp-pdf-device-duplicates-20260728` وتعيين `confirm_upload=true`.
+الحارس داخل المسار يمنع إصدار نسخة `main` القديمة. قبل تشغيله أنشئ بيئة GitHub
+باسم `testflight` وأضف الأسرار الآتية داخلها:
 
 - `APPLE_TEAM_ID`
 - `APP_STORE_CONNECT_KEY_ID`

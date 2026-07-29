@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_upload:
-        description: Upload the signed build to App Store Connect
+        description: Upload the signed build from the release branch to App Store Connect
         required: true
         default: false
         type: boolean
@@ -18,7 +18,11 @@ concurrency:
 
 jobs:
   release:
-    if: ${{ inputs.confirm_upload }}
+    if: >-
+      ${{
+        inputs.confirm_upload &&
+        github.ref_name == 'fix-whatsapp-pdf-device-duplicates-20260728'
+      }}
     runs-on: macos-15
     timeout-minutes: 60
     environment: testflight
