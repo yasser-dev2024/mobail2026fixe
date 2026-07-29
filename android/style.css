@@ -166,8 +166,7 @@ footer span {
 }
 
 .hero h1,
-.preview h2,
-.iphone-info h2 {
+.preview h2 {
   margin-top: 0;
 }
 
@@ -416,8 +415,7 @@ footer span {
   color: var(--yellow);
 }
 
-.preview h2,
-.iphone-info h2 {
+.preview h2 {
   margin: 12px 0 30px;
   font-size: clamp(1.8rem, 4vw, 2.7rem);
   line-height: 1.35;
@@ -490,30 +488,6 @@ footer span {
   border-radius: 35px;
   object-fit: cover;
   object-position: 50% 5%;
-}
-
-.iphone-info {
-  max-width: 850px;
-  margin-inline: auto;
-  padding: 92px clamp(20px, 7vw, 70px);
-  text-align: center;
-}
-
-.iphone-info p {
-  margin: -10px auto 25px;
-  color: #b8c7ce;
-  font-size: 0.94rem;
-  line-height: 2;
-}
-
-.text-link {
-  display: inline-flex;
-  padding: 11px 17px;
-  border: 1px solid rgba(112, 168, 255, 0.25);
-  border-radius: 13px;
-  color: #b5ceff;
-  font-size: 0.8rem;
-  font-weight: 800;
 }
 
 footer {
