@@ -21,6 +21,9 @@
 5. وضع رابط Apple الناتج في متغير البناء:
    `NEXT_PUBLIC_IOS_INSTALL_URL`.
 
+مسار الإصدار السحابي الموقّع وتعليمات أسراره موثقان في
+[`TESTFLIGHT_RELEASE.md`](TESTFLIGHT_RELEASE.md).
+
 الموقع يقبل فقط روابط `apps.apple.com` و`testflight.apple.com` المطابقة لمسار
 تثبيت صحيح، ويرفض ZIP وIPA و`itms-services` وروابط النطاقات المشابهة. عند غياب
 رابط Apple يبقى زر iPhone صفحة حالة فقط ولا ينزّل أي ملف إلى جهاز المستخدم.
