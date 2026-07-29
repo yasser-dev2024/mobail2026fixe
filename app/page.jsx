@@ -57,7 +57,7 @@ function DownloadButton({ compact = false }) {
           <Icon name="android" />
         </span>
         <span>
-          <small>تحميل مباشر • الإصدار 1.0.1</small>
+          <small>تحميل مباشر • الإصدار 1.0.0</small>
           <strong>تحميل تطبيق Android</strong>
         </span>
         <Icon name="download" />
