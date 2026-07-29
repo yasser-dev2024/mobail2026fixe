@@ -1,0 +1,68 @@
+name: iOS TestFlight release
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_upload:
+        description: Upload the signed build from the release branch to App Store Connect
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      ${{
+        inputs.confirm_upload &&
+        github.ref_name == 'fix-whatsapp-pdf-device-duplicates-20260728'
+      }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: testflight
+    env:
+      IOS_BUNDLE_ID: com.proshop.mobileShopPro
+      BUILD_NUMBER: ${{ github.run_number }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+      IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+      IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Install pinned Flutter SDK
+        shell: bash
+        run: |
+          git clone \
+            --filter=blob:none \
+            --no-checkout \
+            https://github.com/flutter/flutter.git \
+            "$RUNNER_TEMP/flutter"
+          git -C "$RUNNER_TEMP/flutter" checkout \
+            --detach \
+            6fba2447e95c451518584c35e25f5433f14d888c
+          test "$(
+            git -C "$RUNNER_TEMP/flutter" rev-parse HEAD
+          )" = "6fba2447e95c451518584c35e25f5433f14d888c"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Test application
+        run: |
+          flutter config --no-analytics
+          flutter pub get
+          flutter test
+
+      - name: Build, audit, and upload signed IPA
+        shell: bash
+        run: bash tools/ios_testflight_release.sh
