@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vinext dev",
-    "build": "vinext build && node scripts/copy-hosting-config.mjs",
+    "test:web": "node --test web-tests/*.test.mjs",
+    "build": "npm run test:web && node scripts/build-vinext.mjs && node scripts/copy-hosting-config.mjs",
     "start": "vinext start"
   },
   "dependencies": {

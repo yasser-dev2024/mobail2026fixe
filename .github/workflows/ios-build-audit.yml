@@ -42,6 +42,14 @@ jobs:
           ruby -c ios/Podfile
           grep -q "PERMISSION_CAMERA=1" ios/Podfile
           grep -q "PERMISSION_NOTIFICATIONS=1" ios/Podfile
+          /usr/libexec/PlistBuddy -c "Print :NSCameraUsageDescription" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :NSPhotoLibraryUsageDescription" ios/Runner/Info.plist
+          ! /usr/libexec/PlistBuddy -c "Print :NSAppTransportSecurity:NSAllowsArbitraryLoads" ios/Runner/Info.plist
+          ! find ios -type f \( \
+            -name "*.ipa" -o \
+            -name "*.p12" -o \
+            -name "*.mobileprovision" \
+          \) | grep -q .
 
       - name: Resolve dependencies
         shell: bash

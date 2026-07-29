@@ -1,8 +1,15 @@
+import {
+  approvedIosInstallUrl,
+  iosDistributionName,
+} from "./distribution.js";
+
 const ANDROID_URL =
   "https://github.com/yasser-dev2024/mobail2026fixe/raw/refs/heads/fix-whatsapp-pdf-device-duplicates-20260728/android/releases/Maintenance-Assistant-v1.0.0-universal.apk";
 
-const IPHONE_URL =
-  "https://github.com/yasser-dev2024/mobail2026fixe/raw/refs/heads/fix-whatsapp-pdf-device-duplicates-20260728/iphone/Maintenance-Assistant-iPhone-Source-v1.0.0.zip";
+const IPHONE_URL = approvedIosInstallUrl(
+  process.env.NEXT_PUBLIC_IOS_INSTALL_URL,
+);
+const IPHONE_CHANNEL = iosDistributionName(IPHONE_URL);
 
 function Icon({ name }) {
   const paths = {
@@ -52,6 +59,18 @@ function Icon({ name }) {
 }
 
 function DownloadButtons({ compact = false }) {
+  const iphoneProps = IPHONE_URL
+    ? {
+        href: IPHONE_URL,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        "aria-label": `تثبيت مساعد الصيانة من ${IPHONE_CHANNEL}`,
+      }
+    : {
+        href: "#iphone-install",
+        "aria-label": "عرض حالة إصدار iPhone الآمن",
+      };
+
   return (
     <div className={`download-actions${compact ? " compact" : ""}`}>
       <a className="download-button android-button" href={ANDROID_URL}>
@@ -64,15 +83,25 @@ function DownloadButtons({ compact = false }) {
         </span>
         <Icon name="download" />
       </a>
-      <a className="download-button iphone-button" href={IPHONE_URL}>
+      <a
+        className={`download-button iphone-button${
+          IPHONE_URL ? "" : " iphone-waiting"
+        }`}
+        data-ios-distribution={IPHONE_URL ? IPHONE_CHANNEL : "unavailable"}
+        {...iphoneProps}
+      >
         <span className="button-symbol apple-symbol">
           <Icon name="apple" />
         </span>
         <span>
-          <small>مجلد iPhone ZIP</small>
-          <strong>نسخة iPhone</strong>
+          <small>
+            {IPHONE_URL
+              ? `تثبيت آمن عبر ${IPHONE_CHANNEL}`
+              : "لم تُنشر لدى Apple بعد"}
+          </small>
+          <strong>{IPHONE_URL ? "تثبيت على iPhone" : "حالة نسخة iPhone"}</strong>
         </span>
-        <Icon name="download" />
+        <Icon name={IPHONE_URL ? "download" : "shield"} />
       </a>
     </div>
   );
@@ -210,6 +239,65 @@ export default function Home() {
         <div>
           <strong>الضمان</strong>
           <span>متابعة وتنبيهات</span>
+        </div>
+      </section>
+
+      <section
+        className="iphone-install"
+        id="iphone-install"
+        aria-labelledby="iphone-install-title"
+      >
+        <div className="iphone-install-copy">
+          <span>تثبيت iPhone الآمن</span>
+          <h2 id="iphone-install-title">
+            لن يفتح زر iPhone ملفات ZIP مرة أخرى
+          </h2>
+          {IPHONE_URL ? (
+            <p>
+              زر iPhone ينقلك الآن مباشرة إلى {IPHONE_CHANNEL}، وتبقى عملية
+              التثبيت والتحديث تحت إشراف Apple.
+            </p>
+          ) : (
+            <p>
+              لا توجد في إعدادات المشروع حتى الآن نسخة موقعة ومنشورة على App
+              Store أو TestFlight. لذلك أوقفنا تنزيل ملفات المصدر نهائيًا حتى
+              لا تمتلئ التنزيلات بملفات لا يمكن تثبيتها.
+            </p>
+          )}
+        </div>
+        <ol className="iphone-install-steps">
+          <li>
+            <span>1</span>
+            <p>
+              <strong>رابط Apple فقط</strong>
+              <small>App Store أو TestFlight، وليس ZIP أو IPA مجهولًا.</small>
+            </p>
+          </li>
+          <li>
+            <span>2</span>
+            <p>
+              <strong>موافقة واضحة</strong>
+              <small>يعرض iPhone اسم التطبيق والناشر قبل التثبيت.</small>
+            </p>
+          </li>
+          <li>
+            <span>3</span>
+            <p>
+              <strong>بدون ملفات جانبية</strong>
+              <small>لا ملفات تعريف ولا شهادات مؤسسات غير موثوقة.</small>
+            </p>
+          </li>
+        </ol>
+        <div className="iphone-safety-note">
+          <span>
+            <Icon name="shield" />
+          </span>
+          <p>
+            <strong>حماية جهاز المستخدم أولًا</strong>
+            <small>
+              الموقع يرفض أي رابط iPhone لا يعمل عبر نطاق Apple الرسمي.
+            </small>
+          </p>
         </div>
       </section>
 

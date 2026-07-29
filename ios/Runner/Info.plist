@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>نحتاج إذن الكاميرا لتصوير حالة الجهاز عند الاستلام والصيانة.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>نحتاج إذن الصور فقط عند اختيار صورة لإرفاقها بسجل الجهاز أو الصيانة.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
