@@ -121,7 +121,7 @@ export default function Home() {
           </div>
           <div className="eyebrow">
             <span />
-            نسخة Android جاهزة للتحميل
+            Android بطابع مختلف
           </div>
           <h1>
             خلّ شغلك أسرع
@@ -149,7 +149,7 @@ export default function Home() {
         <div className="hero-visual">
           <div className="visual-label">
             <span />
-            صورة حقيقية من التطبيق
+            واجهة من قلب العمل
           </div>
           <div className="device-frame">
             <span className="device-camera" />
@@ -204,7 +204,7 @@ export default function Home() {
       <section className="features" aria-labelledby="features-title">
         <div className="section-heading">
           <span>مزايا التطبيق</span>
-          <h2 id="features-title">كل ما تحتاجه لإدارة الصيانة بوضوح</h2>
+          <h2 id="features-title">أدوات ذكية. يوم أخف. عمل أوضح.</h2>
           <p>أدوات عملية مختصرة تساعدك على إنجاز العمل ومتابعة كل جهاز.</p>
         </div>
         <div className="feature-grid">
