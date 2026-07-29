@@ -35,6 +35,16 @@ android {
             !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
             !keystoreProperties.getProperty("keyPassword").isNullOrBlank() &&
             !keystoreProperties.getProperty("keyAlias").isNullOrBlank()
+    val releaseBuildRequested =
+        gradle.startParameter.taskNames.any {
+            it.contains("release", ignoreCase = true)
+        }
+
+    if (releaseBuildRequested && !hasReleaseSigning) {
+        throw GradleException(
+            "Release signing is not configured. Add android/key.properties and a private release keystore.",
+        )
+    }
 
     signingConfigs {
         if (hasReleaseSigning) {
@@ -60,14 +70,10 @@ android {
 
     buildTypes {
         release {
-            // A local production key is used when configured. Fresh clones can
-            // still produce an installable APK without committing any secret.
-            signingConfig =
-                if (hasReleaseSigning) {
-                    signingConfigs.getByName("release")
-                } else {
-                    signingConfigs.getByName("debug")
-                }
+            isDebuggable = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }
