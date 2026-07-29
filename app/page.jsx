@@ -1,15 +1,5 @@
-import {
-  approvedIosInstallUrl,
-  iosDistributionName,
-} from "./distribution.js";
-
 const ANDROID_URL =
   "https://github.com/yasser-dev2024/mobail2026fixe/raw/refs/heads/fix-whatsapp-pdf-device-duplicates-20260728/android/releases/Maintenance-Assistant-v1.0.0-universal.apk";
-
-const IPHONE_URL = approvedIosInstallUrl(
-  process.env.NEXT_PUBLIC_IOS_INSTALL_URL,
-);
-const IPHONE_CHANNEL = iosDistributionName(IPHONE_URL);
 
 function Icon({ name }) {
   const paths = {
@@ -23,9 +13,6 @@ function Icon({ name }) {
         <path d="m8 5-2-3m10 3 2-3M6.5 9h11M7 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Zm1.5 12v3m7-3v3M5 9H3v6h2m14-6h2v6h-2" />
         <path d="M9 8h.01M15 8h.01" />
       </>
-    ),
-    apple: (
-      <path d="M16.7 13.2c0-2.8 2.3-4.1 2.4-4.2a5.1 5.1 0 0 0-4-2.2c-1.7-.2-3.3 1-4.1 1s-2.1-1-3.5-1c-1.8 0-3.5 1.1-4.5 2.7-1.9 3.3-.5 8.2 1.4 10.9.9 1.3 2 2.8 3.5 2.7 1.4-.1 1.9-.9 3.6-.9s2.2.9 3.6.9c1.5 0 2.5-1.3 3.4-2.7a11.8 11.8 0 0 0 1.5-3.1 4.7 4.7 0 0 1-3.3-4.1ZM14 5c.8-1 1.3-2.3 1.2-3.6-1.2.1-2.5.8-3.3 1.7-.7.8-1.4 2.2-1.2 3.5 1.3.1 2.5-.6 3.3-1.6Z" />
     ),
     repair: (
       <path d="m14.5 6.5 3-3a5 5 0 0 1-6.2 6.2l-7.1 7.1a2.1 2.1 0 0 0 3 3l7.1-7.1a5 5 0 0 0 6.2-6.2l-3 3-3-3Z" />
@@ -58,50 +45,22 @@ function Icon({ name }) {
   );
 }
 
-function DownloadButtons({ compact = false }) {
-  const iphoneProps = IPHONE_URL
-    ? {
-        href: IPHONE_URL,
-        target: "_blank",
-        rel: "noopener noreferrer",
-        "aria-label": `تثبيت مساعد الصيانة من ${IPHONE_CHANNEL}`,
-      }
-    : {
-        href: "#iphone-install",
-        "aria-label": "عرض حالة إصدار iPhone الآمن",
-      };
-
+function DownloadButton({ compact = false }) {
   return (
     <div className={`download-actions${compact ? " compact" : ""}`}>
-      <a className="download-button android-button" href={ANDROID_URL}>
+      <a
+        className="download-button android-button"
+        href={ANDROID_URL}
+        aria-label="تحميل مساعد الصيانة لأجهزة Android"
+      >
         <span className="button-symbol">
           <Icon name="android" />
         </span>
         <span>
-          <small>تحميل مباشر</small>
-          <strong>نسخة Android</strong>
+          <small>تحميل مباشر • الإصدار 1.0.1</small>
+          <strong>تحميل تطبيق Android</strong>
         </span>
         <Icon name="download" />
-      </a>
-      <a
-        className={`download-button iphone-button${
-          IPHONE_URL ? "" : " iphone-waiting"
-        }`}
-        data-ios-distribution={IPHONE_URL ? IPHONE_CHANNEL : "unavailable"}
-        {...iphoneProps}
-      >
-        <span className="button-symbol apple-symbol">
-          <Icon name="apple" />
-        </span>
-        <span>
-          <small>
-            {IPHONE_URL
-              ? `تثبيت آمن عبر ${IPHONE_CHANNEL}`
-              : "لم تُنشر لدى Apple بعد"}
-          </small>
-          <strong>{IPHONE_URL ? "تثبيت على iPhone" : "حالة نسخة iPhone"}</strong>
-        </span>
-        <Icon name={IPHONE_URL ? "download" : "shield"} />
       </a>
     </div>
   );
@@ -156,30 +115,30 @@ export default function Home() {
               height="118"
             />
             <span>
-              <small>تطبيق عربي متكامل</small>
+              <small>مصمم خصيصًا لأجهزة Android</small>
               <strong>مساعد الصيانة</strong>
             </span>
           </div>
           <div className="eyebrow">
             <span />
-            كل أعمال الصيانة في مكان واحد
+            نسخة Android جاهزة للتحميل
           </div>
           <h1>
-            من استلام الجهاز
+            خلّ شغلك أسرع
             <br />
-            <em>حتى تسليمه للعميل.</em>
+            <em>وكل صيانة أوضح.</em>
           </h1>
           <p>
-            نظّم طلبات الصيانة والضمان والفواتير وتواصل مع العميل من واجهة
-            عربية سهلة وسريعة.
+            تطبيق Android عربي وحيوي يجمع طلبات الصيانة والضمان والفواتير
+            والتواصل مع العميل في مكان واحد.
           </p>
-          <DownloadButtons />
+          <DownloadButton />
           <div className="quick-points">
             <span>
-              <Icon name="check" /> عربي بالكامل
+              <Icon name="check" /> يعمل على Android
             </span>
             <span>
-              <Icon name="check" /> سهل الاستخدام
+              <Icon name="check" /> تحميل مباشر
             </span>
             <span>
               <Icon name="check" /> يعمل دون اشتراك
@@ -239,65 +198,6 @@ export default function Home() {
         <div>
           <strong>الضمان</strong>
           <span>متابعة وتنبيهات</span>
-        </div>
-      </section>
-
-      <section
-        className="iphone-install"
-        id="iphone-install"
-        aria-labelledby="iphone-install-title"
-      >
-        <div className="iphone-install-copy">
-          <span>تثبيت iPhone الآمن</span>
-          <h2 id="iphone-install-title">
-            لن يفتح زر iPhone ملفات ZIP مرة أخرى
-          </h2>
-          {IPHONE_URL ? (
-            <p>
-              زر iPhone ينقلك الآن مباشرة إلى {IPHONE_CHANNEL}، وتبقى عملية
-              التثبيت والتحديث تحت إشراف Apple.
-            </p>
-          ) : (
-            <p>
-              لا توجد في إعدادات المشروع حتى الآن نسخة موقعة ومنشورة على App
-              Store أو TestFlight. لذلك أوقفنا تنزيل ملفات المصدر نهائيًا حتى
-              لا تمتلئ التنزيلات بملفات لا يمكن تثبيتها.
-            </p>
-          )}
-        </div>
-        <ol className="iphone-install-steps">
-          <li>
-            <span>1</span>
-            <p>
-              <strong>رابط Apple فقط</strong>
-              <small>App Store أو TestFlight، وليس ZIP أو IPA مجهولًا.</small>
-            </p>
-          </li>
-          <li>
-            <span>2</span>
-            <p>
-              <strong>موافقة واضحة</strong>
-              <small>يعرض iPhone اسم التطبيق والناشر قبل التثبيت.</small>
-            </p>
-          </li>
-          <li>
-            <span>3</span>
-            <p>
-              <strong>بدون ملفات جانبية</strong>
-              <small>لا ملفات تعريف ولا شهادات مؤسسات غير موثوقة.</small>
-            </p>
-          </li>
-        </ol>
-        <div className="iphone-safety-note">
-          <span>
-            <Icon name="shield" />
-          </span>
-          <p>
-            <strong>حماية جهاز المستخدم أولًا</strong>
-            <small>
-              الموقع يرفض أي رابط iPhone لا يعمل عبر نطاق Apple الرسمي.
-            </small>
-          </p>
         </div>
       </section>
 
@@ -368,10 +268,10 @@ export default function Home() {
           loading="lazy"
         />
         <div>
-          <span>ابدأ بتنظيم أعمال الصيانة</span>
-          <h2>حمّل مساعد الصيانة الآن</h2>
+          <span>نسخة Android جاهزة الآن</span>
+          <h2>حمّل مساعد الصيانة وابدأ العمل</h2>
         </div>
-        <DownloadButtons compact />
+        <DownloadButton compact />
       </section>
 
       <footer>
