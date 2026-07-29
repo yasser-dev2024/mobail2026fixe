@@ -62,4 +62,14 @@ jobs:
           test -d build/ios/iphoneos/Runner.app
           test ! -e build/ios/iphoneos/Runner.app/embedded.mobileprovision
           plutil -lint build/ios/iphoneos/Runner.app/Info.plist
-          test "$(defaults read "$PWD/build/ios/iphoneos/Runner.app/Info" CFBundleDisplayName)" = "مساعد الصيانة"
+          app_plist="build/ios/iphoneos/Runner.app/Info.plist"
+          display_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$app_plist")
+          bundle_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$app_plist")
+          version_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app_plist")
+          version_code=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$app_plist")
+          printf 'Display name: %s\nBundle: %s\nVersion: %s (%s)\n' \
+            "$display_name" "$bundle_id" "$version_name" "$version_code"
+          test "$display_name" = "مساعد الصيانة"
+          test "$bundle_id" = "com.proshop.mobileShopPro"
+          test "$version_name" = "1.0.1"
+          test "$version_code" = "2"
