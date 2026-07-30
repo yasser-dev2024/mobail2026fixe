@@ -146,37 +146,25 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="hero-visual">
+        <div className="hero-visual technician-visual">
           <div className="visual-label">
             <span />
-            واجهة من قلب العمل
+            خبير الصيانة يوجّهك
           </div>
-          <div className="device-frame">
-            <span className="device-camera" />
+          <figure className="technician-stage">
             <img
-              src="/assets/real-warranty.png"
-              alt="واجهة استلام الجهاز تحت الضمان داخل تطبيق مساعد الصيانة"
-              width="1200"
-              height="1920"
+              src="/assets/repair-technician-android-v1.png"
+              alt="فني صيانة أنيميشن يحمل هاتفًا ومفكًا ويشير إلى زر تحميل تطبيق Android"
+              width="931"
+              height="1690"
               fetchPriority="high"
             />
-          </div>
-          <div className="visual-card warranty-card">
-            <span>
-              <Icon name="shield" />
-            </span>
+          </figure>
+          <div className="promo-chip">
+            <span />
             <p>
-              <strong>ضمان واضح</strong>
-              <small>استلام ومتابعة بسهولة</small>
-            </p>
-          </div>
-          <div className="visual-card pdf-card">
-            <span>
-              <Icon name="document" />
-            </span>
-            <p>
-              <strong>فاتورة PDF</strong>
-              <small>جاهزة للمشاركة</small>
+              <small>اضغط هنا</small>
+              <strong>وحَمّل التطبيق</strong>
             </p>
           </div>
         </div>

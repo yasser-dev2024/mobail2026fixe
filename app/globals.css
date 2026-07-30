@@ -437,6 +437,75 @@ svg {
   transform: rotate(-7deg);
 }
 
+.technician-visual {
+  min-height: 690px;
+  padding: 44px 4px 10px;
+}
+
+.technician-visual::before {
+  inset: 11% -4% 3%;
+  border-radius: 42% 58% 50% 50%;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(201, 255, 76, 0.72), transparent 34%),
+    #dffff4;
+  box-shadow: 14px 14px 0 var(--yellow);
+  opacity: 1;
+  transform: rotate(-4deg);
+}
+
+.technician-stage {
+  position: relative;
+  display: grid;
+  min-height: 660px;
+  align-items: end;
+  justify-items: center;
+  margin: 0;
+}
+
+.technician-stage::before {
+  position: absolute;
+  top: 18%;
+  right: 2%;
+  width: 160px;
+  height: 160px;
+  border: 22px solid rgba(96, 120, 255, 0.18);
+  border-radius: 50%;
+  content: "";
+  transform: rotate(14deg);
+}
+
+.technician-stage::after {
+  position: absolute;
+  right: 7%;
+  bottom: 9%;
+  width: 58px;
+  height: 58px;
+  border: 12px solid var(--coral);
+  border-radius: 19px;
+  content: "";
+  opacity: 0.78;
+  transform: rotate(18deg);
+}
+
+.technician-stage img {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 385px);
+  height: auto;
+  filter: drop-shadow(0 26px 24px rgba(16, 38, 31, 0.2));
+  transform: translateX(-4%);
+}
+
+.technician-visual .visual-label {
+  top: 15px;
+  right: 12%;
+}
+
+.technician-visual .promo-chip {
+  right: 1%;
+  bottom: 10%;
+}
+
 .promo-frame {
   position: relative;
   width: min(100%, 420px);
@@ -926,6 +995,38 @@ footer {
   .hero-visual {
     width: 100%;
     padding: 39px 14px 16px;
+  }
+
+  .technician-visual {
+    min-height: 620px;
+    padding: 42px 5px 5px;
+  }
+
+  .technician-stage {
+    min-height: 585px;
+  }
+
+  .technician-stage img {
+    width: min(90vw, 340px);
+    transform: none;
+  }
+
+  .technician-stage::before {
+    top: 20%;
+    right: 0;
+    width: 125px;
+    height: 125px;
+    border-width: 17px;
+  }
+
+  .technician-visual .visual-label {
+    top: 8px;
+    right: 13px;
+  }
+
+  .technician-visual .promo-chip {
+    right: 5px;
+    bottom: 9%;
   }
 
   .visual-label {

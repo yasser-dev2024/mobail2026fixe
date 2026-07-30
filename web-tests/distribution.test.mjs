@@ -49,6 +49,8 @@ test("the public page renders an Android-only download experience", async () => 
   assert.doesNotMatch(page, /iphone-button|iphone-install|IPHONE_URL/i);
   assert.match(page, /className="download-button android-button"/);
   assert.match(page, /تحميل تطبيق Android/);
+  assert.match(page, /repair-technician-android-v1\.png/);
+  assert.match(page, /فني صيانة أنيميشن/);
   assert.doesNotMatch(page, /href\s*=\s*["'`][^"'`]*\.(?:zip|ipa|plist)/i);
   assert.doesNotMatch(page, /itms-services:/i);
   assert.doesNotMatch(
