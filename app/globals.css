@@ -77,7 +77,7 @@ svg {
 
 .page {
   position: relative;
-  width: min(100%, 1280px);
+  width: min(100%, 1520px);
   min-height: 100vh;
   margin-inline: auto;
   overflow: hidden;
@@ -95,9 +95,9 @@ svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 76px;
-  margin: 18px clamp(18px, 4vw, 52px) 0;
-  padding: 10px 14px 10px 18px;
+  min-height: 84px;
+  margin: 20px clamp(24px, 4vw, 64px) 0;
+  padding: 12px 18px 12px 22px;
   border: 2px solid var(--ink);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.9);
@@ -112,8 +112,8 @@ svg {
 }
 
 .brand img {
-  width: 50px;
-  height: 50px;
+  width: 54px;
+  height: 54px;
   border: 2px solid var(--ink);
   border-radius: 15px;
   box-shadow: 4px 4px 0 var(--lime);
@@ -126,7 +126,7 @@ svg {
 }
 
 .brand strong {
-  font-size: 1rem;
+  font-size: 1.08rem;
 }
 
 .brand small,
@@ -161,11 +161,11 @@ svg {
 .hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.04fr) minmax(390px, 0.86fr);
+  grid-template-columns: minmax(0, 1.08fr) minmax(470px, 0.92fr);
   align-items: center;
-  gap: clamp(42px, 6vw, 82px);
-  min-height: 740px;
-  padding: 64px clamp(24px, 6vw, 76px) 82px;
+  gap: clamp(40px, 5vw, 76px);
+  min-height: 820px;
+  padding: 68px clamp(38px, 6vw, 90px) 88px;
 }
 
 .hero::before {
@@ -191,7 +191,7 @@ svg {
   border: 18px solid var(--coral);
   border-radius: 24px;
   content: "";
-  opacity: 0.72;
+  opacity: 0.32;
   pointer-events: none;
   transform: rotate(17deg);
 }
@@ -203,11 +203,13 @@ svg {
 }
 
 .hero-copy {
-  padding: clamp(30px, 4vw, 48px);
+  padding: clamp(40px, 5vw, 64px);
   border: 2px solid var(--ink);
-  border-radius: 18px 52px 52px 52px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 13px 13px 0 rgba(0, 184, 148, 0.2);
+  border-radius: 38px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    14px 14px 0 rgba(0, 184, 148, 0.2),
+    0 30px 80px rgba(16, 38, 31, 0.1);
   backdrop-filter: blur(12px);
 }
 
@@ -234,11 +236,11 @@ svg {
 }
 
 .hero h1 {
-  max-width: 650px;
-  margin: 20px 0 18px;
+  max-width: 760px;
+  margin: 24px 0 20px;
   color: var(--ink);
-  font-size: clamp(2.75rem, 5.35vw, 5rem);
-  line-height: 1.02;
+  font-size: clamp(3.15rem, 5.5vw, 5.8rem);
+  line-height: 0.98;
   letter-spacing: -0.06em;
 }
 
@@ -264,17 +266,17 @@ svg {
 }
 
 .hero-copy > p {
-  max-width: 610px;
+  max-width: 690px;
   margin: 0;
   color: var(--muted);
-  font-size: clamp(0.98rem, 1.45vw, 1.13rem);
+  font-size: clamp(1rem, 1.4vw, 1.18rem);
   line-height: 1.95;
 }
 
 .download-actions {
   display: flex;
-  width: min(100%, 410px);
-  margin-top: 29px;
+  width: min(100%, 490px);
+  margin-top: 34px;
 }
 
 .download-button {
@@ -282,14 +284,14 @@ svg {
   display: grid;
   width: 100%;
   min-width: 290px;
-  min-height: 72px;
+  min-height: 84px;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 13px;
-  padding: 10px 16px;
+  gap: 16px;
+  padding: 12px 18px;
   overflow: hidden;
   border: 2px solid var(--ink);
-  border-radius: 18px;
+  border-radius: 22px;
   isolation: isolate;
   transition:
     transform 180ms ease,
@@ -342,8 +344,8 @@ svg {
 
 .button-symbol {
   display: grid;
-  width: 43px;
-  height: 43px;
+  width: 50px;
+  height: 50px;
   place-items: center;
   border-radius: 13px;
   background: var(--lime);
@@ -362,11 +364,11 @@ svg {
 
 .download-button small {
   color: #b9c7c1;
-  font-size: 0.67rem;
+  font-size: 0.73rem;
 }
 
 .download-button strong {
-  font-size: 0.98rem;
+  font-size: 1.12rem;
 }
 
 .download-button > svg {
@@ -408,7 +410,7 @@ svg {
 }
 
 .hero-visual {
-  width: min(100%, 470px);
+  width: min(100%, 540px);
   margin-inline: auto;
   padding: 40px 15px 24px;
   isolation: isolate;
@@ -438,25 +440,27 @@ svg {
 }
 
 .technician-visual {
-  min-height: 690px;
-  padding: 44px 4px 10px;
+  min-height: 750px;
+  padding: 54px 8px 8px;
 }
 
 .technician-visual::before {
-  inset: 11% -4% 3%;
-  border-radius: 42% 58% 50% 50%;
+  inset: 9% -2% 2%;
+  border-radius: 48px;
   background:
     radial-gradient(circle at 50% 34%, rgba(201, 255, 76, 0.72), transparent 34%),
     #dffff4;
-  box-shadow: 14px 14px 0 var(--yellow);
+  box-shadow:
+    16px 16px 0 var(--yellow),
+    0 30px 70px rgba(16, 38, 31, 0.12);
   opacity: 1;
-  transform: rotate(-4deg);
+  transform: none;
 }
 
 .technician-stage {
   position: relative;
   display: grid;
-  min-height: 660px;
+  min-height: 715px;
   align-items: end;
   justify-items: center;
   margin: 0;
@@ -483,27 +487,22 @@ svg {
   border: 12px solid var(--coral);
   border-radius: 19px;
   content: "";
-  opacity: 0.78;
+  opacity: 0.25;
   transform: rotate(18deg);
 }
 
 .technician-stage img {
   position: relative;
   z-index: 2;
-  width: min(100%, 385px);
+  width: min(100%, 420px);
   height: auto;
   filter: drop-shadow(0 26px 24px rgba(16, 38, 31, 0.2));
   transform: translateX(-4%);
 }
 
 .technician-visual .visual-label {
-  top: 15px;
-  right: 12%;
-}
-
-.technician-visual .promo-chip {
-  right: 1%;
-  bottom: 10%;
+  top: 16px;
+  right: 9%;
 }
 
 .promo-frame {
@@ -579,17 +578,17 @@ svg {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
-  margin: 0 clamp(24px, 6vw, 76px);
+  margin: 0 clamp(38px, 6vw, 90px);
 }
 
 .stats div {
   display: grid;
-  min-height: 112px;
+  min-height: 124px;
   gap: 7px;
   padding: 20px 14px;
   place-content: center;
   border: 2px solid var(--ink);
-  border-radius: 23px;
+  border-radius: 20px;
   background: #fff;
   text-align: center;
 }
@@ -1312,7 +1311,7 @@ footer {
 
 .final-cta {
   display: grid;
-  grid-template-columns: auto minmax(250px, 1fr) minmax(280px, 390px);
+  grid-template-columns: auto minmax(250px, 1fr) auto;
   align-items: center;
   gap: 24px;
   margin: 112px clamp(24px, 6vw, 76px) 0;
@@ -1348,23 +1347,36 @@ footer {
   font-size: clamp(1.4rem, 2.5vw, 2.15rem);
 }
 
-.final-cta .android-button {
-  border-color: #fff;
-  background: #fff;
-  color: var(--ink);
-  box-shadow: 8px 8px 0 var(--yellow);
+.release-status {
+  display: flex;
+  min-width: 190px;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 15px;
+  border: 2px solid #fff;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.final-cta .button-symbol {
-  background: var(--lime);
+.release-status > svg {
+  width: 28px;
+  height: 28px;
+  color: var(--lime);
+  stroke-width: 2.5;
 }
 
-.final-cta .download-button small {
-  color: #65756f;
+.release-status > span {
+  display: grid;
+  gap: 3px;
 }
 
-.final-cta .download-button > svg {
-  color: var(--teal);
+.release-status small {
+  color: #c5d3ce;
+  font-size: 0.66rem;
+}
+
+.release-status strong {
+  font-size: 0.9rem;
 }
 
 @media (max-width: 1080px) {
@@ -1372,9 +1384,8 @@ footer {
     grid-template-columns: auto 1fr;
   }
 
-  .final-cta .download-actions {
+  .release-status {
     grid-column: 1 / -1;
-    max-width: 430px;
     justify-self: center;
   }
 }

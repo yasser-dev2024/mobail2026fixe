@@ -57,8 +57,8 @@ function DownloadButton({ compact = false }) {
           <Icon name="android" />
         </span>
         <span>
-          <small>تحميل مباشر • الإصدار 1.0.0</small>
-          <strong>تحميل تطبيق Android</strong>
+          <small>نسخة Android الرسمية • الإصدار 1.0.1</small>
+          <strong>تحميل مساعد الصيانة</strong>
         </span>
         <Icon name="download" />
       </a>
@@ -100,9 +100,7 @@ export default function Home() {
             <small>إدارة مراكز صيانة الجوالات</small>
           </span>
         </a>
-        <a className="header-download" href="#download">
-          تحميل التطبيق
-        </a>
+        <span className="header-badge">Android • النسخة الرسمية 1.0.1</span>
       </header>
 
       <section className="hero" id="top">
@@ -121,16 +119,17 @@ export default function Home() {
           </div>
           <div className="eyebrow">
             <span />
-            Android بطابع مختلف
+            المنصة المهنية لمراكز صيانة الجوالات
           </div>
           <h1>
-            خلّ شغلك أسرع
+            إدارة الصيانة
             <br />
-            <em>وكل صيانة أوضح.</em>
+            <em>بمعيار احترافي.</em>
           </h1>
           <p>
-            تطبيق Android عربي وحيوي يجمع طلبات الصيانة والضمان والفواتير
-            والتواصل مع العميل في مكان واحد.
+            نظام عربي متكامل لإدارة استلام الأجهزة ومراحل الصيانة والضمانات
+            والفواتير والتواصل مع العملاء، صُمم ليمنح مركزك حضورًا منظمًا
+            وتجربة موثوقة.
           </p>
           <DownloadButton />
           <div className="quick-points">
@@ -138,10 +137,10 @@ export default function Home() {
               <Icon name="check" /> يعمل على Android
             </span>
             <span>
-              <Icon name="check" /> تحميل مباشر
+              <Icon name="check" /> تنزيل مباشر وآمن
             </span>
             <span>
-              <Icon name="check" /> يعمل دون اشتراك
+              <Icon name="check" /> واجهة عربية بالكامل
             </span>
           </div>
         </div>
@@ -149,7 +148,7 @@ export default function Home() {
         <div className="hero-visual technician-visual">
           <div className="visual-label">
             <span />
-            خبير الصيانة يوجّهك
+            مصمم لمراكز الصيانة الحديثة
           </div>
           <figure className="technician-stage">
             <img
@@ -160,13 +159,6 @@ export default function Home() {
               fetchPriority="high"
             />
           </figure>
-          <div className="promo-chip">
-            <span />
-            <p>
-              <small>اضغط هنا</small>
-              <strong>وحَمّل التطبيق</strong>
-            </p>
-          </div>
         </div>
       </section>
 
@@ -259,7 +251,13 @@ export default function Home() {
           <span>نسخة Android جاهزة الآن</span>
           <h2>حمّل مساعد الصيانة وابدأ العمل</h2>
         </div>
-        <DownloadButton compact />
+        <div className="release-status" aria-label="حالة إصدار Android">
+          <Icon name="check" />
+          <span>
+            <small>الإصدار الرسمي</small>
+            <strong>Android 1.0.1</strong>
+          </span>
+        </div>
       </section>
 
       <footer>
