@@ -20,4 +20,23 @@ void main() {
       expect(normalizeBackgroundAlertRoute(null), isNull);
     });
   });
+
+  group('BackgroundAlertPermissionStatus', () {
+    test('keeps full-screen alerts enabled for older native bridges', () {
+      final status = BackgroundAlertPermissionStatus.fromMap(const {
+        'notificationsGranted': true,
+        'exactAlarmsGranted': true,
+      });
+
+      expect(status.fullScreenAlertsGranted, isTrue);
+    });
+
+    test('reports when Android has disabled full-screen alerts', () {
+      final status = BackgroundAlertPermissionStatus.fromMap(const {
+        'fullScreenAlertsGranted': false,
+      });
+
+      expect(status.fullScreenAlertsGranted, isFalse);
+    });
+  });
 }

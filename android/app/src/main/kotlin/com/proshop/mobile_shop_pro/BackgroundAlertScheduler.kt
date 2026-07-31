@@ -115,12 +115,17 @@ object BackgroundAlertScheduler {
             val intervalMs = readIntervalMillis(database)
             val due = loadDueAlerts(database, now, intervalMs)
             if (due.isNotEmpty()) {
+                // Device details enrich the existing full-screen alert, but a
+                // missing/legacy table or image must never suppress the alert.
+                val devices = runCatching {
+                    loadDevicePreviews(database, due)
+                }.getOrDefault(emptyList())
                 showSystemNotification(
                     context,
                     due,
                     now,
                     readPlaybackSettings(database),
-                    loadDevicePreviews(database, due),
+                    devices,
                 )
                 markFired(database, due.map { it.id }, now)
             }

@@ -2,6 +2,7 @@ package com.proshop.mobile_shop_pro
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ComponentName
@@ -77,6 +78,9 @@ class MainActivity : FlutterActivity() {
                 "openExactAlarmSettings" -> {
                     result.success(openExactAlarmSettings())
                 }
+                "openFullScreenAlertSettings" -> {
+                    result.success(openFullScreenAlertSettings())
+                }
                 "openAutoStartSettings" -> {
                     result.success(openAutoStartSettings())
                 }
@@ -130,6 +134,11 @@ class MainActivity : FlutterActivity() {
         val exactAlarmsGranted =
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
                 alarmManager.canScheduleExactAlarms()
+        val notificationManager =
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val fullScreenAlertsGranted =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+                notificationManager.canUseFullScreenIntent()
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         val batteryOptimizationIgnored =
             Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
@@ -144,6 +153,7 @@ class MainActivity : FlutterActivity() {
         return mapOf(
             "notificationsGranted" to notificationsGranted,
             "exactAlarmsGranted" to exactAlarmsGranted,
+            "fullScreenAlertsGranted" to fullScreenAlertsGranted,
             "batteryOptimizationIgnored" to batteryOptimizationIgnored,
             "requiresAutoStart" to requiresAutoStart,
         )
@@ -156,6 +166,19 @@ class MainActivity : FlutterActivity() {
         return launchSettingsIntent(
             Intent(
                 Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                Uri.parse("package:$packageName"),
+            ),
+        )
+    }
+
+    private fun openFullScreenAlertSettings(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
+        val notificationManager =
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (notificationManager.canUseFullScreenIntent()) return true
+        return launchSettingsIntent(
+            Intent(
+                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
                 Uri.parse("package:$packageName"),
             ),
         )

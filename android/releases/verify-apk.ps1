@@ -1,12 +1,12 @@
 param(
-    [string]$ApkPath = (Join-Path $PSScriptRoot "Maintenance-Assistant-v1.0.2-universal.apk")
+    [string]$ApkPath = (Join-Path $PSScriptRoot "Maintenance-Assistant-v1.0.3-universal.apk")
 )
 
 $ErrorActionPreference = "Stop"
 
 $expectedPackage = "com.proshop.mobile_shop_pro"
-$expectedVersionName = "1.0.2"
-$expectedVersionCode = "3"
+$expectedVersionName = "1.0.3"
+$expectedVersionCode = "4"
 $expectedCertificate = "6401ff72d3ad598507fc773d328fbfc61ad9a0966d2e30ddb5e696c97e8eba47"
 $requiredAbis = @("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 
@@ -100,6 +100,67 @@ if ($manifest -notmatch "android:allowBackup.*0x0") {
 }
 if ($manifest -notmatch "android:usesCleartextTraffic.*0x0") {
     throw "Cleartext HTTP traffic must be disabled"
+}
+if ($manifest -notmatch [regex]::Escape("com.proshop.mobile_shop_pro.StrongAlertActivity")) {
+    throw "The native full-screen alert activity is missing"
+}
+if ($manifest -notmatch "android:showWhenLocked.*0xffffffff") {
+    throw "The alert activity must remain visible on the lock screen"
+}
+if ($manifest -notmatch "android:turnScreenOn.*0xffffffff") {
+    throw "The alert activity must wake the screen"
+}
+
+$permissions = (& $aapt dump permissions $toolApkPath) -join "`n"
+foreach ($permission in @(
+    "android.permission.POST_NOTIFICATIONS",
+    "android.permission.SCHEDULE_EXACT_ALARM",
+    "android.permission.USE_FULL_SCREEN_INTENT",
+    "android.permission.WAKE_LOCK"
+)) {
+    if ($permissions -notmatch [regex]::Escape($permission)) {
+        throw "Required alert permission is missing: $permission"
+    }
+}
+
+# Verify the release binary itself contains the restored full-screen path and
+# the device-data payload. This prevents publishing a stale APK from the site.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$archive = [System.IO.Compression.ZipFile]::OpenRead($toolApkPath)
+try {
+    $requiredDexMarkers = @(
+        "StrongAlertActivity",
+        "setFullScreenIntent",
+        "strong_alert_devices",
+        "fullScreenAlertsGranted",
+        "canUseFullScreenIntent"
+    )
+    $foundDexMarkers = @{}
+    foreach ($marker in $requiredDexMarkers) {
+        $foundDexMarkers[$marker] = $false
+    }
+    foreach ($entry in $archive.Entries | Where-Object { $_.FullName -match '^classes\d*\.dex$' }) {
+        $entryStream = $entry.Open()
+        try {
+            $memory = New-Object System.IO.MemoryStream
+            $entryStream.CopyTo($memory)
+            $dexText = [System.Text.Encoding]::ASCII.GetString($memory.ToArray())
+            foreach ($marker in $requiredDexMarkers) {
+                if ($dexText.Contains($marker)) {
+                    $foundDexMarkers[$marker] = $true
+                }
+            }
+        } finally {
+            $entryStream.Dispose()
+        }
+    }
+    foreach ($marker in $requiredDexMarkers) {
+        if (-not $foundDexMarkers[$marker]) {
+            throw "Required alert feature is missing from the APK: $marker"
+        }
+    }
+} finally {
+    $archive.Dispose()
 }
 
 & $zipalign -c 4 $toolApkPath | Out-Null

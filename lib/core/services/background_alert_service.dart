@@ -89,6 +89,9 @@ class BackgroundAlertService {
   Future<bool> openExactAlarmSettings() =>
       _invokeSettings('openExactAlarmSettings');
 
+  Future<bool> openFullScreenAlertSettings() =>
+      _invokeSettings('openFullScreenAlertSettings');
+
   Future<bool> openAutoStartSettings() =>
       _invokeSettings('openAutoStartSettings');
 
@@ -148,12 +151,14 @@ class BackgroundAlertService {
 class BackgroundAlertPermissionStatus {
   final bool notificationsGranted;
   final bool exactAlarmsGranted;
+  final bool fullScreenAlertsGranted;
   final bool batteryOptimizationIgnored;
   final bool requiresAutoStart;
 
   const BackgroundAlertPermissionStatus({
     this.notificationsGranted = true,
     this.exactAlarmsGranted = true,
+    this.fullScreenAlertsGranted = true,
     this.batteryOptimizationIgnored = true,
     this.requiresAutoStart = false,
   });
@@ -164,6 +169,7 @@ class BackgroundAlertPermissionStatus {
     return BackgroundAlertPermissionStatus(
       notificationsGranted: values?['notificationsGranted'] != false,
       exactAlarmsGranted: values?['exactAlarmsGranted'] != false,
+      fullScreenAlertsGranted: values?['fullScreenAlertsGranted'] != false,
       batteryOptimizationIgnored:
           values?['batteryOptimizationIgnored'] != false,
       requiresAutoStart: values?['requiresAutoStart'] == true,

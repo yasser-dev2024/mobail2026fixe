@@ -1,5 +1,5 @@
 const ANDROID_URL =
-  "https://github.com/yasser-dev2024/mobail2026fixe/raw/refs/heads/fix-whatsapp-pdf-device-duplicates-20260728/android/releases/Maintenance-Assistant-v1.0.2-universal.apk";
+  "https://github.com/yasser-dev2024/mobail2026fixe/raw/refs/heads/fix-whatsapp-pdf-device-duplicates-20260728/android/releases/Maintenance-Assistant-v1.0.3-universal.apk";
 
 function Icon({ name }) {
   const paths = {
@@ -57,7 +57,7 @@ function DownloadButton({ compact = false }) {
           <Icon name="android" />
         </span>
         <span>
-          <small>نسخة Android الرسمية • الإصدار 1.0.2</small>
+          <small>نسخة Android الرسمية • الإصدار 1.0.3</small>
           <strong>تحميل مساعد الصيانة</strong>
         </span>
         <Icon name="download" />
@@ -100,7 +100,7 @@ export default function Home() {
             <small>إدارة مراكز صيانة الجوالات</small>
           </span>
         </a>
-        <span className="header-badge">Android • النسخة الرسمية 1.0.2</span>
+        <span className="header-badge">Android • النسخة الرسمية 1.0.3</span>
       </header>
 
       <section className="hero" id="top">
@@ -255,7 +255,7 @@ export default function Home() {
           <Icon name="check" />
           <span>
             <small>الإصدار الرسمي</small>
-            <strong>Android 1.0.2</strong>
+            <strong>Android 1.0.3</strong>
           </span>
         </div>
       </section>

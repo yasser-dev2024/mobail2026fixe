@@ -25,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   static const _minimumSplashDuration = Duration(seconds: 6);
   static const _privacyPolicyVersion = '2026-07-17.1';
-  static const _backgroundPermissionsGuideVersion = '2026-07-28.1';
+  static const _backgroundPermissionsGuideVersion = '2026-08-01.1';
 
   late final AnimationController _motionController;
   late final AnimationController _progressController;
@@ -231,6 +231,16 @@ class _SplashScreenState extends State<SplashScreen>
         'اختر السماح ليظهر تنبيه الصيانة أو الضمان والجوال خارج التطبيق.',
       );
       await Permission.notification.request();
+      status = await service.permissionStatus();
+    }
+
+    if (!status.fullScreenAlertsGranted) {
+      await _updateProgress(
+        0.79,
+        'تفعيل شاشة التنبيه الكاملة...',
+        'فعّل «السماح بالتنبيهات بملء الشاشة» لمساعد الصيانة ثم ارجع إلى التطبيق.',
+      );
+      await _openExternalSettings(service.openFullScreenAlertSettings);
       status = await service.permissionStatus();
     }
 
@@ -728,6 +738,12 @@ class _BackgroundPermissionsDialog extends StatelessWidget {
                   title: 'الإشعارات',
                   reason:
                       'لعرض تنبيه الصيانة المتأخرة والضمان المنتهي أو القريب من الانتهاء.',
+                ),
+                const _BackgroundPermissionRow(
+                  icon: Icons.fullscreen_rounded,
+                  title: 'التنبيه بملء الشاشة',
+                  reason:
+                      'لإظهار شاشة التنبيه العاجل خارج التطبيق وعلى شاشة القفل كما كانت.',
                 ),
                 const _BackgroundPermissionRow(
                   icon: Icons.alarm_rounded,
