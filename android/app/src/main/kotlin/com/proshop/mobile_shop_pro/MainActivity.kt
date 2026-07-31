@@ -27,6 +27,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onStart() {
         super.onStart()
+        AlertRingingService.stopAlert(applicationContext)
         BackgroundAlertScheduler.setAppVisible(applicationContext, true)
     }
 

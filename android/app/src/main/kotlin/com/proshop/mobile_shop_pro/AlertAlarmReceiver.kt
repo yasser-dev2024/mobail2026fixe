@@ -13,6 +13,8 @@ class AlertAlarmReceiver : BroadcastReceiver() {
                 BackgroundAlertScheduler.showVerificationNotification(
                     context.applicationContext,
                 )
+            ACTION_SILENCE_STRONG_ALERT ->
+                AlertRingingService.stopAlert(context.applicationContext)
         }
     }
 
@@ -21,5 +23,7 @@ class AlertAlarmReceiver : BroadcastReceiver() {
             "com.proshop.mobile_shop_pro.CHECK_BACKGROUND_ALERTS"
         const val ACTION_VERIFY_BACKGROUND_ALERTS =
             "com.proshop.mobile_shop_pro.VERIFY_BACKGROUND_ALERTS"
+        const val ACTION_SILENCE_STRONG_ALERT =
+            "com.proshop.mobile_shop_pro.SILENCE_STRONG_ALERT"
     }
 }

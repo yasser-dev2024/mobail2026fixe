@@ -1,12 +1,12 @@
 param(
-    [string]$ApkPath = (Join-Path $PSScriptRoot "Maintenance-Assistant-v1.0.1-universal.apk")
+    [string]$ApkPath = (Join-Path $PSScriptRoot "Maintenance-Assistant-v1.0.2-universal.apk")
 )
 
 $ErrorActionPreference = "Stop"
 
 $expectedPackage = "com.proshop.mobile_shop_pro"
-$expectedVersionName = "1.0.1"
-$expectedVersionCode = "2"
+$expectedVersionName = "1.0.2"
+$expectedVersionCode = "3"
 $expectedCertificate = "6401ff72d3ad598507fc773d328fbfc61ad9a0966d2e30ddb5e696c97e8eba47"
 $requiredAbis = @("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 

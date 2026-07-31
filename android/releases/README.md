@@ -2,13 +2,13 @@
 
 الملف المنشور في هذا المجلد هو APK عالمي واحد يمكن تنزيله مباشرة على الجوال:
 
-`Maintenance-Assistant-v1.0.1-universal.apk`
+`Maintenance-Assistant-v1.0.2-universal.apk`
 
 مواصفات الملف:
 
 - اسم التطبيق: مساعد الصيانة
 - اسم الحزمة: `com.proshop.mobile_shop_pro`
-- الإصدار: `1.0.1` (`versionCode 2`)
+- الإصدار: `1.0.2` (`versionCode 3`)
 - الحد الأدنى: Android 5.0 (`minSdk 21`)
 - المعماريات: `arm64-v8a` و`armeabi-v7a` و`x86` و`x86_64`
 - النوع: Release وغير قابل للتصحيح
@@ -43,7 +43,7 @@ https://drive.google.com/uc?export=download&id=FILE_ID
 
 عند إصدار تحديث مستقبلي:
 
-1. ارفع `versionCode` في `pubspec.yaml`، مثل `1.0.1+2`.
+1. ارفع `versionCode` في `pubspec.yaml`، مثل `1.0.3+4`.
 2. استخدم مفتاح التوقيع نفسه دائماً حتى يقبل Android التحديث.
 3. لا ترفع `key.properties` أو ملف التوقيع `.jks` إلى Git أو Drive.
 4. قبل النشر، تأكد أن بصمة شهادة APK تطابق البصمة المسجلة أعلاه.

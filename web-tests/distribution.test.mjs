@@ -48,6 +48,11 @@ test("the public page renders an Android-only download experience", async () => 
   assert.doesNotMatch(page, /Maintenance-Assistant-iPhone-Source/i);
   assert.doesNotMatch(page, /iphone-button|iphone-install|IPHONE_URL/i);
   assert.match(page, /className="download-button android-button"/);
+  assert.match(
+    page,
+    /Maintenance-Assistant-v1\.0\.2-universal\.apk/,
+  );
+  assert.doesNotMatch(page, /Maintenance-Assistant-v1\.0\.[01]-universal\.apk/);
   assert.equal((page.match(/<DownloadButton\s*\/>/g) ?? []).length, 1);
   assert.doesNotMatch(page, /promo-chip|header-download|<DownloadButton compact/);
   assert.match(page, /تحميل مساعد الصيانة/);

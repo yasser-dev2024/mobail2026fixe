@@ -11,12 +11,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
-import android.media.AudioAttributes
-import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Build
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import java.io.File
 import java.text.SimpleDateFormat
@@ -38,6 +33,13 @@ internal data class StoredBackgroundAlert(
     val lastFiredAt: Long?,
 )
 
+internal data class BackgroundAlertPlaybackSettings(
+    val soundsEnabled: Boolean,
+    val volume: Float,
+    val vibrationEnabled: Boolean,
+    val repeatCount: Int,
+)
+
 /**
  * Android-owned alert engine.
  *
@@ -50,10 +52,12 @@ object BackgroundAlertScheduler {
     private const val DATABASE_DIRECTORY = "Database"
     private const val DATABASE_NAME = "mobile_shop_pro.db"
     private const val LEGACY_CHANNEL_ID = "proshop_background_alerts_v1"
-    private const val MAINTENANCE_CHANNEL_ID = "proshop_maintenance_alerts_v2"
-    private const val WARRANTY_CHANNEL_ID = "proshop_warranty_alerts_v2"
-    private const val GENERAL_CHANNEL_ID = "proshop_general_alerts_v2"
-    private const val NOTIFICATION_ID = 7301
+    private const val OLD_MAINTENANCE_CHANNEL_ID = "proshop_maintenance_alerts_v2"
+    private const val OLD_WARRANTY_CHANNEL_ID = "proshop_warranty_alerts_v2"
+    private const val OLD_GENERAL_CHANNEL_ID = "proshop_general_alerts_v2"
+    private const val MAINTENANCE_CHANNEL_ID = "proshop_maintenance_alarm_v3"
+    private const val WARRANTY_CHANNEL_ID = "proshop_warranty_alarm_v3"
+    private const val GENERAL_CHANNEL_ID = "proshop_general_alarm_v3"
     private const val ALARM_REQUEST_CODE = 7302
     private const val PREFS_NAME = "proshop_background_alert_state"
     private const val PREF_APP_VISIBLE = "app_visible"
@@ -109,7 +113,12 @@ object BackgroundAlertScheduler {
             val intervalMs = readIntervalMillis(database)
             val due = loadDueAlerts(database, now, intervalMs)
             if (due.isNotEmpty()) {
-                showSystemNotification(context, due, now)
+                showSystemNotification(
+                    context,
+                    due,
+                    now,
+                    readPlaybackSettings(database),
+                )
                 markFired(database, due.map { it.id }, now)
             }
         } catch (_: Exception) {
@@ -142,6 +151,12 @@ object BackgroundAlertScheduler {
                 ),
             ),
             now,
+            BackgroundAlertPlaybackSettings(
+                soundsEnabled = true,
+                volume = 1f,
+                vibrationEnabled = true,
+                repeatCount = 3,
+            ),
         )
         scheduleNext(context)
     }
@@ -199,54 +214,49 @@ object BackgroundAlertScheduler {
         val manager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
-
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
-        val maintenanceSound = Uri.parse(
-            "android.resource://${context.packageName}/${R.raw.proshop_maintenance_alert}",
-        )
-        val warrantySound = Uri.parse(
-            "android.resource://${context.packageName}/${R.raw.proshop_warranty_alert}",
-        )
-        val generalSound =
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        manager.deleteNotificationChannel(OLD_MAINTENANCE_CHANNEL_ID)
+        manager.deleteNotificationChannel(OLD_WARRANTY_CHANNEL_ID)
+        manager.deleteNotificationChannel(OLD_GENERAL_CHANNEL_ID)
 
         manager.createNotificationChannel(
             NotificationChannel(
                 MAINTENANCE_CHANNEL_ID,
-                "تنبيهات الصيانة المتأخرة",
+                "إنذار الصيانة المتأخرة",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "الصوت 1 لتنبيه بقاء الجوال والصيانة المتأخرة"
-                setSound(maintenanceSound, audioAttributes)
-                enableVibration(true)
+                description = "إنذار قوي بالصوت 1 لبقاء الجوال والصيانة المتأخرة"
+                setSound(null, null)
+                enableVibration(false)
+                enableLights(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 setShowBadge(true)
             },
         )
         manager.createNotificationChannel(
             NotificationChannel(
                 WARRANTY_CHANNEL_ID,
-                "تنبيهات الضمان",
+                "إنذار الضمان",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "الصوت 2 للضمان المنتهي أو القريب من الانتهاء"
-                setSound(warrantySound, audioAttributes)
-                enableVibration(true)
+                description = "إنذار قوي بالصوت 2 للضمان المنتهي أو القريب من الانتهاء"
+                setSound(null, null)
+                enableVibration(false)
+                enableLights(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 setShowBadge(true)
             },
         )
         manager.createNotificationChannel(
             NotificationChannel(
                 GENERAL_CHANNEL_ID,
-                "تنبيهات مساعد الصيانة العامة",
+                "إنذارات مساعد الصيانة العامة",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "تنبيهات الحالات والمخزون وبقية أحداث مساعد الصيانة"
-                setSound(generalSound, audioAttributes)
-                enableVibration(true)
+                description = "إنذار واضح للحالات والمخزون وبقية أحداث مساعد الصيانة"
+                setSound(null, null)
+                enableVibration(false)
                 enableLights(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 setShowBadge(true)
             },
         )
@@ -361,6 +371,36 @@ object BackgroundAlertScheduler {
         return minutes * 60L * 1000L
     }
 
+    private fun readPlaybackSettings(
+        database: SQLiteDatabase,
+    ): BackgroundAlertPlaybackSettings {
+        val values = mutableMapOf<String, String>()
+        database.rawQuery(
+            """
+            SELECT key, value
+            FROM settings
+            WHERE key IN (
+              'alert_sounds_enabled',
+              'alert_volume',
+              'alert_vibration_enabled',
+              'alert_repeat_count'
+            )
+            """.trimIndent(),
+            null,
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                values[cursor.getString(0)] = cursor.getString(1).orEmpty()
+            }
+        }
+        return BackgroundAlertPlaybackSettings(
+            soundsEnabled = values["alert_sounds_enabled"] != "false",
+            volume = (values["alert_volume"]?.toFloatOrNull() ?: 1f)
+                .coerceIn(0f, 1f),
+            vibrationEnabled = values["alert_vibration_enabled"] != "false",
+            repeatCount = values["alert_repeat_count"]?.toIntOrNull() ?: 1,
+        )
+    }
+
     private fun loadDueAlerts(
         database: SQLiteDatabase,
         now: Long,
@@ -406,21 +446,8 @@ object BackgroundAlertScheduler {
         context: Context,
         alerts: List<StoredBackgroundAlert>,
         now: Long,
+        playback: BackgroundAlertPlaybackSettings,
     ) {
-        val launchIntent =
-            context.packageManager.getLaunchIntentForPackage(context.packageName)
-                ?: Intent(context, MainActivity::class.java)
-        launchIntent.apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra("open_notifications", true)
-        }
-        val contentIntent = PendingIntent.getActivity(
-            context,
-            NOTIFICATION_ID,
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
         val critical = alerts.any { it.priority == "critical" }
         val title = if (alerts.size == 1) {
             alerts.first().title
@@ -433,40 +460,27 @@ object BackgroundAlertScheduler {
             "افتح التطبيق لإدارة التنبيهات أو تأجيلها أو إيقافها."
         }
         val channelId = channelIdFor(alerts)
-        val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_stat_proshop)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(
-                if (alerts.size == 1) {
-                    NotificationCompat.BigTextStyle().bigText(message)
-                } else {
-                    NotificationCompat.InboxStyle().also { style ->
-                        alerts.take(6).forEach { style.addLine(it.title) }
-                        if (alerts.size > 6) {
-                            style.addLine("و${alerts.size - 6} تنبيهات أخرى")
-                        }
-                        style.setSummaryText("مساعد الصيانة")
-                    }
-                },
-            )
-            .setContentIntent(contentIntent)
-            .setAutoCancel(true)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setPriority(
-                if (critical) {
-                    NotificationCompat.PRIORITY_MAX
-                } else {
-                    NotificationCompat.PRIORITY_HIGH
-                },
-            )
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setNumber(alerts.size)
-            .setWhen(now)
-            .setShowWhen(true)
-            .setOnlyAlertOnce(false)
-
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
+        val soundKind = when (channelId) {
+            MAINTENANCE_CHANNEL_ID -> AlertRingingService.SOUND_MAINTENANCE
+            WARRANTY_CHANNEL_ID -> AlertRingingService.SOUND_WARRANTY
+            else -> AlertRingingService.SOUND_GENERAL
+        }
+        AlertRingingService.startAlert(
+            context,
+            StrongAlertPayload(
+                title = title,
+                message = message,
+                channelId = channelId,
+                soundKind = soundKind,
+                alertCount = alerts.size,
+                critical = critical,
+                createdAt = now,
+                soundsEnabled = playback.soundsEnabled,
+                volume = playback.volume,
+                vibrationEnabled = playback.vibrationEnabled,
+                repeatCount = playback.repeatCount,
+            ),
+        )
     }
 
     private fun channelIdFor(alerts: List<StoredBackgroundAlert>): String {
