@@ -165,9 +165,12 @@ class _SplashScreenState extends State<SplashScreen>
       await Future.delayed(const Duration(milliseconds: 780));
 
       if (!mounted) return;
-      final route = BackgroundAlertService().takePendingOpenNotifications()
-          ? '/notifications'
-          : nextRoute;
+      final backgroundAlerts = BackgroundAlertService();
+      final pendingRoute = backgroundAlerts.takePendingOpenRoute();
+      final route = pendingRoute ??
+          (backgroundAlerts.takePendingOpenNotifications()
+              ? '/notifications'
+              : nextRoute);
       context.go(route);
     } catch (_) {
       if (!mounted) return;

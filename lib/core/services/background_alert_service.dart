@@ -4,6 +4,14 @@ import 'package:flutter/services.dart';
 
 import '../router/app_router.dart';
 
+String? normalizeBackgroundAlertRoute(Object? value) {
+  if (value is! String) return null;
+  final route = value.trim();
+  if (route == '/warranty') return route;
+  final detailRoute = RegExp(r'^/(devices|maintenance)/[A-Za-z0-9_-]+$');
+  return detailRoute.hasMatch(route) ? route : null;
+}
+
 /// Bridges the Flutter notification repository to Android's alarm receiver.
 ///
 /// Android owns the actual alarm after it is scheduled, so it can query the
@@ -19,6 +27,7 @@ class BackgroundAlertService {
       MethodChannel('com.proshop.mobile_shop_pro/background_alerts');
 
   bool _openNotificationsRequested = false;
+  String? _pendingOpenRoute;
 
   bool get _isSupported => Platform.isAndroid;
 
@@ -28,7 +37,19 @@ class BackgroundAlertService {
       _channel.setMethodCallHandler(_handleNativeCall);
       final shouldOpen =
           await _channel.invokeMethod<bool>('initialize') ?? false;
-      if (shouldOpen) {
+      String? initialRoute;
+      try {
+        initialRoute = normalizeBackgroundAlertRoute(
+          await _channel.invokeMethod<String>('takeInitialAlertRoute'),
+        );
+      } on PlatformException {
+        // Older Android builds still retain the existing notifications route.
+      } on MissingPluginException {
+        // Older Android builds still retain the existing notifications route.
+      }
+      if (initialRoute != null) {
+        _openRoute(initialRoute);
+      } else if (shouldOpen) {
         _openNotifications();
       }
     } on PlatformException {
@@ -43,6 +64,12 @@ class BackgroundAlertService {
     final requested = _openNotificationsRequested;
     _openNotificationsRequested = false;
     return requested;
+  }
+
+  String? takePendingOpenRoute() {
+    final route = _pendingOpenRoute;
+    _pendingOpenRoute = null;
+    return route;
   }
 
   Future<BackgroundAlertPermissionStatus> permissionStatus() async {
@@ -82,6 +109,9 @@ class BackgroundAlertService {
   Future<void> _handleNativeCall(MethodCall call) async {
     if (call.method == 'openNotifications') {
       _openNotifications();
+    } else if (call.method == 'openAlertRoute') {
+      final route = normalizeBackgroundAlertRoute(call.arguments);
+      if (route != null) _openRoute(route);
     }
   }
 
@@ -92,6 +122,15 @@ class BackgroundAlertService {
       return;
     }
     AppRouter.router.go('/notifications');
+  }
+
+  void _openRoute(String route) {
+    final path = AppRouter.router.routerDelegate.currentConfiguration.uri.path;
+    if (path == '/splash') {
+      _pendingOpenRoute = route;
+      return;
+    }
+    AppRouter.router.go(route);
   }
 
   Future<void> reschedule() async {

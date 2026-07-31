@@ -21,6 +21,21 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import org.json.JSONArray
+import org.json.JSONObject
+
+internal data class StrongAlertDevicePreview(
+    val brand: String,
+    val model: String,
+    val color: String?,
+    val storage: String?,
+    val imei: String?,
+    val ticketNumber: String?,
+    val customerName: String?,
+    val imagePath: String?,
+    val targetRoute: String,
+    val targetLabel: String,
+)
 
 internal data class StrongAlertPayload(
     val title: String,
@@ -34,6 +49,7 @@ internal data class StrongAlertPayload(
     val volume: Float,
     val vibrationEnabled: Boolean,
     val repeatCount: Int,
+    val devices: List<StrongAlertDevicePreview> = emptyList(),
 )
 
 /**
@@ -259,6 +275,7 @@ class AlertRingingService : Service() {
 
         const val EXTRA_TITLE = "strong_alert_title"
         const val EXTRA_MESSAGE = "strong_alert_message"
+        const val EXTRA_DEVICES = "strong_alert_devices"
         private const val EXTRA_CHANNEL_ID = "strong_alert_channel_id"
         private const val EXTRA_SOUND_KIND = "strong_alert_sound_kind"
         private const val EXTRA_ALERT_COUNT = "strong_alert_count"
@@ -326,6 +343,7 @@ class AlertRingingService : Service() {
                         Intent.FLAG_ACTIVITY_SINGLE_TOP
                     putExtra(EXTRA_TITLE, payload.title)
                     putExtra(EXTRA_MESSAGE, payload.message)
+                    putExtra(EXTRA_DEVICES, encodeDevices(payload.devices))
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
@@ -384,6 +402,7 @@ class AlertRingingService : Service() {
             putExtra(EXTRA_VOLUME, payload.volume)
             putExtra(EXTRA_VIBRATION_ENABLED, payload.vibrationEnabled)
             putExtra(EXTRA_REPEAT_COUNT, payload.repeatCount)
+            putExtra(EXTRA_DEVICES, encodeDevices(payload.devices))
         }
 
         private fun Intent.toPayload(): StrongAlertPayload? {
@@ -402,7 +421,68 @@ class AlertRingingService : Service() {
                 volume = getFloatExtra(EXTRA_VOLUME, 1f).coerceIn(0f, 1f),
                 vibrationEnabled = getBooleanExtra(EXTRA_VIBRATION_ENABLED, true),
                 repeatCount = getIntExtra(EXTRA_REPEAT_COUNT, 1),
+                devices = decodeDevices(getStringExtra(EXTRA_DEVICES)),
             )
+        }
+
+        internal fun encodeDevices(devices: List<StrongAlertDevicePreview>): String {
+            val values = JSONArray()
+            devices.forEach { device ->
+                values.put(
+                    JSONObject().apply {
+                        put("brand", device.brand)
+                        put("model", device.model)
+                        putNullable("color", device.color)
+                        putNullable("storage", device.storage)
+                        putNullable("imei", device.imei)
+                        putNullable("ticketNumber", device.ticketNumber)
+                        putNullable("customerName", device.customerName)
+                        putNullable("imagePath", device.imagePath)
+                        put("targetRoute", device.targetRoute)
+                        put("targetLabel", device.targetLabel)
+                    },
+                )
+            }
+            return values.toString()
+        }
+
+        internal fun decodeDevices(encoded: String?): List<StrongAlertDevicePreview> {
+            if (encoded.isNullOrBlank()) return emptyList()
+            return runCatching {
+                val values = JSONArray(encoded)
+                buildList {
+                    for (index in 0 until values.length()) {
+                        val value = values.optJSONObject(index) ?: continue
+                        val route = value.optString("targetRoute").trim()
+                        if (route.isEmpty()) continue
+                        add(
+                            StrongAlertDevicePreview(
+                                brand = value.optString("brand").trim(),
+                                model = value.optString("model").trim(),
+                                color = value.stringOrNull("color"),
+                                storage = value.stringOrNull("storage"),
+                                imei = value.stringOrNull("imei"),
+                                ticketNumber = value.stringOrNull("ticketNumber"),
+                                customerName = value.stringOrNull("customerName"),
+                                imagePath = value.stringOrNull("imagePath"),
+                                targetRoute = route,
+                                targetLabel = value.optString("targetLabel")
+                                    .trim()
+                                    .ifBlank { "فتح الجوال" },
+                            ),
+                        )
+                    }
+                }
+            }.getOrDefault(emptyList())
+        }
+
+        private fun JSONObject.putNullable(key: String, value: String?) {
+            if (value.isNullOrBlank()) put(key, JSONObject.NULL) else put(key, value)
+        }
+
+        private fun JSONObject.stringOrNull(key: String): String? {
+            if (isNull(key)) return null
+            return optString(key).trim().takeIf { it.isNotEmpty() }
         }
     }
 }

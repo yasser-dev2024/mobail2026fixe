@@ -31,6 +31,8 @@ internal data class StoredBackgroundAlert(
     val createdAt: Long,
     val snoozedUntil: Long?,
     val lastFiredAt: Long?,
+    val referenceId: String?,
+    val referenceType: String?,
 )
 
 internal data class BackgroundAlertPlaybackSettings(
@@ -118,6 +120,7 @@ object BackgroundAlertScheduler {
                     due,
                     now,
                     readPlaybackSettings(database),
+                    loadDevicePreviews(database, due),
                 )
                 markFired(database, due.map { it.id }, now)
             }
@@ -148,6 +151,8 @@ object BackgroundAlertScheduler {
                     createdAt = now,
                     snoozedUntil = null,
                     lastFiredAt = null,
+                    referenceId = null,
+                    referenceType = null,
                 ),
             ),
             now,
@@ -410,7 +415,7 @@ object BackgroundAlertScheduler {
         return database.rawQuery(
             """
             SELECT id, type, title, message, priority, created_at,
-                   snoozed_until, last_fired_at
+                   snoozed_until, last_fired_at, reference_id, reference_type
             FROM notifications
             WHERE shop_id = ?
               AND is_read = 0
@@ -435,6 +440,8 @@ object BackgroundAlertScheduler {
                                 cursor.getLong(cursor.getColumnIndexOrThrow("created_at")),
                             snoozedUntil = cursor.longOrNull("snoozed_until"),
                             lastFiredAt = cursor.longOrNull("last_fired_at"),
+                            referenceId = cursor.stringOrNull("reference_id"),
+                            referenceType = cursor.stringOrNull("reference_type"),
                         ),
                     )
                 }
@@ -447,6 +454,7 @@ object BackgroundAlertScheduler {
         alerts: List<StoredBackgroundAlert>,
         now: Long,
         playback: BackgroundAlertPlaybackSettings,
+        devices: List<StrongAlertDevicePreview> = emptyList(),
     ) {
         val critical = alerts.any { it.priority == "critical" }
         val title = if (alerts.size == 1) {
@@ -479,8 +487,164 @@ object BackgroundAlertScheduler {
                 volume = playback.volume,
                 vibrationEnabled = playback.vibrationEnabled,
                 repeatCount = playback.repeatCount,
+                devices = devices,
             ),
         )
+    }
+
+    private fun loadDevicePreviews(
+        database: SQLiteDatabase,
+        alerts: List<StoredBackgroundAlert>,
+    ): List<StrongAlertDevicePreview> {
+        val shopId = readCurrentShopId(database)
+        return alerts.mapNotNull { alert ->
+            runCatching { loadDevicePreview(database, shopId, alert) }.getOrNull()
+        }.distinctBy { it.targetRoute }
+    }
+
+    private fun loadDevicePreview(
+        database: SQLiteDatabase,
+        shopId: String,
+        alert: StoredBackgroundAlert,
+    ): StrongAlertDevicePreview? {
+        val referenceId = alert.referenceId?.takeIf { it.isNotBlank() } ?: return null
+        val referenceType = alert.referenceType ?: return null
+        val query: String
+        val args: Array<String>
+        when (referenceType) {
+            "device" -> {
+                query = """
+                    SELECT d.id AS device_id, d.brand, d.model, d.color, d.storage,
+                           d.imei, d.image_path, c.name AS customer_name,
+                           NULL AS maintenance_id, NULL AS ticket_number
+                    FROM devices d
+                    LEFT JOIN customers c
+                      ON c.id = d.customer_id AND c.shop_id = d.shop_id
+                    WHERE d.shop_id = ? AND d.id = ? AND d.deleted_at IS NULL
+                    LIMIT 1
+                """.trimIndent()
+                args = arrayOf(shopId, referenceId)
+            }
+            "maintenance" -> {
+                query = """
+                    SELECT d.id AS device_id,
+                           COALESCE(NULLIF(d.brand, ''), m.brand) AS brand,
+                           COALESCE(NULLIF(d.model, ''), m.model) AS model,
+                           COALESCE(NULLIF(d.color, ''), m.color) AS color,
+                           d.storage, COALESCE(NULLIF(d.imei, ''), m.imei) AS imei,
+                           d.image_path, c.name AS customer_name,
+                           m.id AS maintenance_id, m.ticket_number
+                    FROM maintenance m
+                    LEFT JOIN devices d
+                      ON d.id = m.device_id AND d.shop_id = m.shop_id AND d.deleted_at IS NULL
+                    LEFT JOIN customers c
+                      ON c.id = m.customer_id AND c.shop_id = m.shop_id
+                    WHERE m.shop_id = ? AND m.id = ? AND m.deleted_at IS NULL
+                    LIMIT 1
+                """.trimIndent()
+                args = arrayOf(shopId, referenceId)
+            }
+            "warranty" -> {
+                query = """
+                    SELECT d.id AS device_id,
+                           COALESCE(NULLIF(d.brand, ''), m.brand) AS brand,
+                           COALESCE(NULLIF(d.model, ''), m.model) AS model,
+                           COALESCE(NULLIF(d.color, ''), m.color) AS color,
+                           d.storage, COALESCE(NULLIF(d.imei, ''), m.imei) AS imei,
+                           d.image_path, c.name AS customer_name,
+                           m.id AS maintenance_id, m.ticket_number
+                    FROM warranties w
+                    JOIN maintenance m
+                      ON m.id = w.maintenance_id AND m.shop_id = w.shop_id
+                    LEFT JOIN devices d
+                      ON d.id = m.device_id AND d.shop_id = m.shop_id AND d.deleted_at IS NULL
+                    LEFT JOIN customers c
+                      ON c.id = m.customer_id AND c.shop_id = m.shop_id
+                    WHERE w.shop_id = ? AND w.id = ? AND m.deleted_at IS NULL
+                    LIMIT 1
+                """.trimIndent()
+                args = arrayOf(shopId, referenceId)
+            }
+            else -> return null
+        }
+
+        return database.rawQuery(query, args).use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            val deviceId = cursor.stringOrNull("device_id")
+            val maintenanceId = cursor.stringOrNull("maintenance_id")
+            val targetRoute = when {
+                deviceId != null -> "/devices/$deviceId"
+                maintenanceId != null -> "/maintenance/$maintenanceId"
+                referenceType == "warranty" -> "/warranty"
+                else -> return@use null
+            }
+            StrongAlertDevicePreview(
+                brand = cursor.stringOrEmpty("brand"),
+                model = cursor.stringOrEmpty("model"),
+                color = cursor.stringOrNull("color"),
+                storage = cursor.stringOrNull("storage"),
+                imei = cursor.stringOrNull("imei"),
+                ticketNumber = cursor.stringOrNull("ticket_number"),
+                customerName = cursor.stringOrNull("customer_name"),
+                imagePath = bestDeviceImage(
+                    database = database,
+                    shopId = shopId,
+                    directPath = cursor.stringOrNull("image_path"),
+                    deviceId = deviceId,
+                    maintenanceId = maintenanceId,
+                ),
+                targetRoute = targetRoute,
+                targetLabel = if (deviceId != null) "فتح الجوال" else "فتح أمر الصيانة",
+            )
+        }
+    }
+
+    private fun bestDeviceImage(
+        database: SQLiteDatabase,
+        shopId: String,
+        directPath: String?,
+        deviceId: String?,
+        maintenanceId: String?,
+    ): String? {
+        validImagePath(directPath)?.let { return it }
+        runCatching {
+            database.rawQuery(
+                """
+                SELECT thumbnail_path, original_path
+                FROM device_photos
+                WHERE shop_id = ? AND deleted_at IS NULL
+                  AND (device_id = ? OR maintenance_id = ?)
+                ORDER BY captured_at DESC
+                """.trimIndent(),
+                arrayOf(shopId, deviceId.orEmpty(), maintenanceId.orEmpty()),
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    validImagePath(cursor.stringOrNull("thumbnail_path"))?.let { return it }
+                    validImagePath(cursor.stringOrNull("original_path"))?.let { return it }
+                }
+            }
+        }
+        if (maintenanceId != null) {
+            runCatching {
+                database.rawQuery(
+                    """
+                    SELECT image_path FROM maintenance_images
+                    WHERE maintenance_id = ? ORDER BY created_at DESC
+                    """.trimIndent(),
+                    arrayOf(maintenanceId),
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        validImagePath(cursor.stringOrNull("image_path"))?.let { return it }
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun validImagePath(path: String?): String? {
+        val value = path?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return value.takeIf { File(it).isFile }
     }
 
     private fun channelIdFor(alerts: List<StoredBackgroundAlert>): String {
@@ -776,6 +940,12 @@ object BackgroundAlertScheduler {
     private fun Cursor.longOrNull(column: String): Long? {
         val index = getColumnIndexOrThrow(column)
         return if (isNull(index)) null else getLong(index)
+    }
+
+    private fun Cursor.stringOrNull(column: String): String? {
+        val index = getColumnIndexOrThrow(column)
+        if (isNull(index)) return null
+        return getString(index)?.trim()?.takeIf { it.isNotEmpty() }
     }
 
     private fun Cursor.stringOrEmpty(column: String): String {

@@ -64,6 +64,9 @@ class MainActivity : FlutterActivity() {
                     BackgroundAlertScheduler.initialize(applicationContext)
                     result.success(consumeOpenNotificationsIntent(intent))
                 }
+                "takeInitialAlertRoute" -> {
+                    result.success(consumeOpenAlertRouteIntent(intent))
+                }
                 "reschedule" -> {
                     BackgroundAlertScheduler.scheduleNext(applicationContext)
                     result.success(null)
@@ -89,9 +92,23 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (consumeOpenNotificationsIntent(intent)) {
+        val alertRoute = consumeOpenAlertRouteIntent(intent)
+        if (alertRoute != null) {
+            backgroundAlertsChannel?.invokeMethod("openAlertRoute", alertRoute)
+        } else if (consumeOpenNotificationsIntent(intent)) {
             backgroundAlertsChannel?.invokeMethod("openNotifications", null)
         }
+    }
+
+    private fun consumeOpenAlertRouteIntent(source: Intent?): String? {
+        val route = source?.getStringExtra(EXTRA_OPEN_ALERT_ROUTE)?.trim()
+        source?.removeExtra(EXTRA_OPEN_ALERT_ROUTE)
+        return route?.takeIf(::isAllowedAlertRoute)
+    }
+
+    private fun isAllowedAlertRoute(route: String): Boolean {
+        if (route == "/warranty") return true
+        return ALERT_DETAIL_ROUTE.matches(route)
     }
 
     private fun consumeOpenNotificationsIntent(source: Intent?): Boolean {
@@ -349,6 +366,8 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
+        const val EXTRA_OPEN_ALERT_ROUTE = "open_alert_route"
+        private val ALERT_DETAIL_ROUTE = Regex("^/(devices|maintenance)/[A-Za-z0-9_-]+$")
         private const val CHANNEL = "com.proshop.mobile_shop_pro/document_share"
         private const val BACKGROUND_ALERTS_CHANNEL =
             "com.proshop.mobile_shop_pro/background_alerts"
